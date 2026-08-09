@@ -1,0 +1,6 @@
+{
+  "name": "Puskesmas Pondok Benda Tangsel",
+  "description": "Website Layanan Informasi, Jadwal Dokter, Pendaftaran Online, dan Sistem Antrean Puskesmas Pondok Benda Tangsel",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
