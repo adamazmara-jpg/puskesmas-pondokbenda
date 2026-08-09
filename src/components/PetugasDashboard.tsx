@@ -33,9 +33,11 @@ import {
   Eye,
   EyeOff,
   Download,
-  Printer
+  Printer,
+  BrainCircuit
 } from 'lucide-react';
 import { PoliService, QueueTicket, QueueStatus, SurveyStats, SurveySubmission } from '../types';
+import { ConfusionMatrixPage } from './ConfusionMatrixPage';
 
 interface UserRole {
   username: string;
@@ -47,10 +49,10 @@ interface UserRole {
 }
 
 const PRESET_USERS: Record<string, { pass: string; user: UserRole }> = {
-  'petugas@puskesmas-pondokbenda.go.id': {
-    pass: 'petugas123',
+  'petugas@puskesmas.go.id': {
+    pass: 'password',
     user: {
-      username: 'petugas@puskesmas-pondokbenda.go.id',
+      username: 'petugas@puskesmas.go.id',
       name: 'Budi Santoso, Amd.Kep',
       role: 'petugas',
       roleName: 'Petugas Loket & Poliklinik',
@@ -58,10 +60,10 @@ const PRESET_USERS: Record<string, { pass: string; user: UserRole }> = {
       avatarBg: 'bg-emerald-700',
     },
   },
-  'admin@puskesmas-pondokbenda.go.id': {
-    pass: 'admin123',
+  'admin@puskesmas.go.id': {
+    pass: 'password',
     user: {
-      username: 'admin@puskesmas-pondokbenda.go.id',
+      username: 'admin@puskesmas.go.id',
       name: 'Dr. Hj. Ratna Sari, M.Kes',
       role: 'admin',
       roleName: 'Administrator Manajemen Puskesmas',
@@ -69,21 +71,21 @@ const PRESET_USERS: Record<string, { pass: string; user: UserRole }> = {
       avatarBg: 'bg-blue-700',
     },
   },
-  'it@puskesmas-pondokbenda.go.id': {
-    pass: 'it123',
+  'superadmin@puskesmas.go.id': {
+    pass: 'password',
     user: {
-      username: 'it@puskesmas-pondokbenda.go.id',
-      name: 'Adam Azmara, S.Kom (IT Admin)',
+      username: 'superadmin@puskesmas.go.id',
+      name: 'Super Administrator IT',
       role: 'it',
-      roleName: 'Tim IT & System Administrator',
+      roleName: 'Super Admin & System Administrator',
       department: 'Divisi Teknologi Informasi Dinkes',
       avatarBg: 'bg-purple-700',
     },
   },
   petugas: {
-    pass: 'petugas123',
+    pass: 'password',
     user: {
-      username: 'petugas@puskesmas-pondokbenda.go.id',
+      username: 'petugas@puskesmas.go.id',
       name: 'Budi Santoso, Amd.Kep',
       role: 'petugas',
       roleName: 'Petugas Loket & Poliklinik',
@@ -92,9 +94,9 @@ const PRESET_USERS: Record<string, { pass: string; user: UserRole }> = {
     },
   },
   admin: {
-    pass: 'admin123',
+    pass: 'password',
     user: {
-      username: 'admin@puskesmas-pondokbenda.go.id',
+      username: 'admin@puskesmas.go.id',
       name: 'Dr. Hj. Ratna Sari, M.Kes',
       role: 'admin',
       roleName: 'Administrator Manajemen Puskesmas',
@@ -102,13 +104,24 @@ const PRESET_USERS: Record<string, { pass: string; user: UserRole }> = {
       avatarBg: 'bg-blue-700',
     },
   },
-  it: {
-    pass: 'it123',
+  superadmin: {
+    pass: 'password',
     user: {
-      username: 'it@puskesmas-pondokbenda.go.id',
-      name: 'Adam Azmara, S.Kom (IT Admin)',
+      username: 'superadmin@puskesmas.go.id',
+      name: 'Super Administrator IT',
       role: 'it',
-      roleName: 'Tim IT & System Administrator',
+      roleName: 'Super Admin & System Administrator',
+      department: 'Divisi Teknologi Informasi Dinkes',
+      avatarBg: 'bg-purple-700',
+    },
+  },
+  it: {
+    pass: 'password',
+    user: {
+      username: 'superadmin@puskesmas.go.id',
+      name: 'Super Administrator IT',
+      role: 'it',
+      roleName: 'Super Admin & System Administrator',
       department: 'Divisi Teknologi Informasi Dinkes',
       avatarBg: 'bg-purple-700',
     },
@@ -137,8 +150,8 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
   const [showPass, setShowPass] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  // Active subtab inside dashboard: 'loket' | 'pasien' | 'ikm' | 'dokter' | 'system_it'
-  const [activeSubTab, setActiveSubTab] = useState<'loket' | 'pasien' | 'ikm' | 'dokter' | 'system_it'>('loket');
+  // Active subtab inside dashboard: 'loket' | 'pasien' | 'ikm' | 'dokter' | 'system_it' | 'confusion-matrix'
+  const [activeSubTab, setActiveSubTab] = useState<'loket' | 'pasien' | 'ikm' | 'dokter' | 'system_it' | 'confusion-matrix'>('loket');
 
   // Queue caller states
   const [selectedPoliId, setSelectedPoliId] = useState<string>(polis[0]?.id || 'poli-umum');
@@ -536,6 +549,18 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
         >
           <Users className="w-4 h-4 text-emerald-400" />
           <span>Manajemen Data Pasien & Tiket ({tickets.length})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('confusion-matrix')}
+          className={`px-4 py-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-2 ${
+            activeSubTab === 'confusion-matrix'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : 'text-slate-700 hover:bg-slate-100 font-extrabold'
+          }`}
+        >
+          <BrainCircuit className="w-4 h-4 text-emerald-400" />
+          <span>Uji Confusion Matrix (Slot Tersedia)</span>
         </button>
 
         {(currentUser.role === 'admin' || currentUser.role === 'it') && (
@@ -1152,6 +1177,11 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
           </div>
 
         </div>
+      )}
+
+      {/* SUBTAB 6: CONFUSION MATRIX EVALUATION */}
+      {activeSubTab === 'confusion-matrix' && (
+        <ConfusionMatrixPage onBack={() => setActiveSubTab('loket')} />
       )}
 
     </div>

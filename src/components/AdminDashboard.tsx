@@ -45,11 +45,13 @@ import {
   RotateCcw,
   Tv,
   Maximize2,
-  Minimize2
+  Minimize2,
+  BrainCircuit
 } from 'lucide-react';
 import { PuskesmasLogo } from './PuskesmasLogo';
 import { PoliService, QueueTicket, DoctorSchedule, HealthArticle, QueueStatus, SurveySubmission } from '../types';
 import { INITIAL_POLIS, INITIAL_DOCTORS, INITIAL_ARTICLES } from '../data/mockData';
+import { ConfusionMatrixPage } from './ConfusionMatrixPage';
 
 interface AdminDashboardProps {
   polis: PoliService[];
@@ -78,7 +80,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   // Sidebar tab state
   const [activeMenu, setActiveMenu] = useState<
-    'dashboard' | 'monitor' | 'antrean' | 'dokter' | 'artikel' | 'layanan' | 'pesan' | 'testimoni' | 'cadangan'
+    'dashboard' | 'monitor' | 'antrean' | 'dokter' | 'artikel' | 'layanan' | 'pesan' | 'testimoni' | 'cadangan' | 'confusion-matrix'
   >('dashboard');
 
   // TV Monitor View & Audio Call State
@@ -1097,6 +1099,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
 
               <button
+                onClick={() => setActiveMenu('confusion-matrix')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+                  activeMenu === 'confusion-matrix'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <BrainCircuit className="w-4 h-4 shrink-0 text-emerald-500" />
+                  <span>Confusion Matrix ML</span>
+                </div>
+                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full border border-emerald-300">
+                  Evaluasi
+                </span>
+              </button>
+
+              <button
                 onClick={() => setActiveMenu('monitor')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
                   activeMenu === 'monitor'
@@ -1614,6 +1633,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   Panggil antrean, update status pasien, dan cetak tiket walk-in
                 </p>
               </div>
+
+              <button
+                onClick={() => setActiveMenu('confusion-matrix')}
+                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-md border border-slate-800 transition flex items-center gap-2.5 shrink-0"
+              >
+                <BrainCircuit className="w-4 h-4 text-emerald-400 animate-pulse" />
+                <span>Uji Confusion Matrix Model AI</span>
+              </button>
             </div>
 
             {/* Caller Header Card */}
@@ -2734,6 +2761,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
           </div>
+        )}
+
+        {/* VIEW 10: CONFUSION MATRIX EVALUATION */}
+        {activeMenu === 'confusion-matrix' && (
+          <ConfusionMatrixPage onBack={() => setActiveMenu('antrean')} />
         )}
 
       </main>
