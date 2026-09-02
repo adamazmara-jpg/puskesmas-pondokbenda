@@ -131,21 +131,27 @@ app.post('/api/pendaftaran', (req, res) => {
       poliId,
       appointmentDate,
       timeSlot,
-      chiefComplaint
+      chiefComplaint,
+      klasterNumber,
+      klasterName,
+      doctorName,
+      registrationNumber,
+      familyHead,
+      medicalRecordNo,
+      oldMedicalRecordNo,
+      documentRmNo,
+      ageFormatted,
+      fee
     } = req.body;
 
-    if (!nik || !fullName || !poliId || !phone) {
-      res.status(400).json({ success: false, message: 'Data wajib belum lengkap (NIK, Nama, Poli, No HP)' });
+    if (!nik || !fullName || !phone) {
+      res.status(400).json({ success: false, message: 'Data wajib belum lengkap (NIK, Nama, No HP)' });
       return;
     }
 
-    const poli = polisStore.find(p => p.id === poliId);
-    if (!poli) {
-      res.status(404).json({ success: false, message: 'Poli tidak ditemukan' });
-      return;
-    }
+    const poli = polisStore.find(p => p.id === (poliId || 'poli-umum')) || polisStore[0];
 
-    const queueNumber = generateNextQueueNumber(poliId);
+    const queueNumber = req.body.queueNumber || generateNextQueueNumber(poli?.id || 'poli-umum');
     const apptDate = appointmentDate || new Date().toISOString().split('T')[0];
 
     const todayStr = new Date().toISOString().split('T')[0];
@@ -160,11 +166,24 @@ app.post('/api/pendaftaran', (req, res) => {
     
     // Estimate call time
     const countWaiting = ticketsStore.filter(
-      t => t.poliId === poliId && t.appointmentDate === apptDate && (t.status === 'Waiting' || t.status === 'Called')
+      t => t.poliId === poli.id && t.appointmentDate === apptDate && (t.status === 'Waiting' || t.status === 'Called')
     ).length;
     
     const estMinutes = countWaiting * 10 + 15;
     const estTimeStr = `~ ${estMinutes} menit setelah poli buka`;
+
+    const seqReg = registrationNumber || String(ticketsStore.length + 1).padStart(4, '0');
+    const defaultRm = medicalRecordNo || `03${nik.slice(-6)}`;
+    const defaultOldRm = oldMedicalRecordNo || `P${nik.slice(0, 8)}101319`;
+    const defaultDocRm = documentRmNo || `P08-10-${new Date().getFullYear()}`;
+    const calculatedFee = fee || (patientType === 'BPJS' ? 'Gratis (BPJS)' : 'Rp. 10,000');
+
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const formattedDate = `${day}/${month}/${year}`;
+    const formattedDateTime = `${day}/${month}/${year} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
 
     const newTicket: QueueTicket = {
       id: `tkt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -177,21 +196,38 @@ app.post('/api/pendaftaran', (req, res) => {
       gender: gender || 'L',
       phone,
       address: address || 'Kota Tangerang Selatan',
-      poliId,
+      poliId: poli.id,
       poliName: poli.name,
+      klasterNumber: klasterNumber || 3,
+      klasterName: klasterName || 'UMUM DEWASA',
+      doctorName: doctorName || poli.doctorName || 'dr. Ananto Adi Swasono',
+      registrationNumber: seqReg,
+      familyHead: familyHead || 'KEPALA KELUARGA',
+      medicalRecordNo: defaultRm,
+      oldMedicalRecordNo: defaultOldRm,
+      documentRmNo: defaultDocRm,
+      ageFormatted: ageFormatted || '22 Thn 2 Bln 5 Hr',
+      fee: calculatedFee,
       appointmentDate: apptDate,
-      timeSlot: timeSlot || '08:00 - 11:00 WIB',
+      timeSlot: timeSlot || '08:00:00 - 11:30:00',
       chiefComplaint: chiefComplaint || 'Pemeriksaan Kesehatan',
       status: 'Waiting',
-      createdAt: new Date().toISOString(),
-      estimatedTime: estTimeStr
+      createdAt: now.toISOString(),
+      estimatedTime: estTimeStr,
+      timestamp: req.body.timestamp || formattedDate,
+      timestampLoket: req.body.timestampLoket || formattedDateTime,
+      hadir: true,
+      timestampBPU: '',
+      timestampApotek: '',
+      statusBPU: 'Menunggu',
+      timestampLab: ''
     };
 
     ticketsStore.unshift(newTicket);
 
     res.json({
       success: true,
-      message: 'Pendaftaran online berhasil! Silakan simpan e-tiket antrean Anda.',
+      message: 'Pendaftaran online berhasil! Silakan simpan dan cetak e-tiket antrean Anda.',
       data: newTicket
     });
   } catch (err: any) {
@@ -204,7 +240,7 @@ app.put('/api/antrean/:id/status', (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
-  if (!['Waiting', 'Called', 'Completed', 'Cancelled'].includes(status)) {
+  if (!['Waiting', 'Verified', 'Called', 'Completed', 'Cancelled'].includes(status)) {
     res.status(400).json({ success: false, message: 'Status antrean tidak valid' });
     return;
   }
@@ -215,7 +251,36 @@ app.put('/api/antrean/:id/status', (req, res) => {
     return;
   }
 
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+  const formattedDateTime = `${day}/${month}/${year} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
   ticketsStore[ticketIndex].status = status;
+  if (req.body.hadir !== undefined) {
+    ticketsStore[ticketIndex].hadir = req.body.hadir;
+  }
+  if (status === 'Called') {
+    if (!ticketsStore[ticketIndex].timestampBPU) {
+      ticketsStore[ticketIndex].timestampBPU = formattedDateTime;
+    }
+    ticketsStore[ticketIndex].statusBPU = 'Sedang Dilayani Dokter';
+  } else if (status === 'Completed') {
+    if (!ticketsStore[ticketIndex].timestampBPU) {
+      ticketsStore[ticketIndex].timestampBPU = formattedDateTime;
+    }
+    if (!ticketsStore[ticketIndex].timestampApotek) {
+      ticketsStore[ticketIndex].timestampApotek = formattedDateTime;
+    }
+    ticketsStore[ticketIndex].statusBPU = 'Selesai Pelayanan';
+  }
+
+  if (req.body.timestampBPU) ticketsStore[ticketIndex].timestampBPU = req.body.timestampBPU;
+  if (req.body.timestampApotek) ticketsStore[ticketIndex].timestampApotek = req.body.timestampApotek;
+  if (req.body.statusBPU) ticketsStore[ticketIndex].statusBPU = req.body.statusBPU;
+  if (req.body.timestampLab) ticketsStore[ticketIndex].timestampLab = req.body.timestampLab;
+
   const updatedTicket = ticketsStore[ticketIndex];
 
   // If status changed to Called, update active queue number in poli
@@ -235,7 +300,7 @@ app.get('/api/jadwal-dokter', (req, res) => {
 });
 
 app.post('/api/jadwal-dokter', (req, res) => {
-  const { doctorName, specialty, poliName, poliId, days, hours, quotaPerDay, status, photoUrl } = req.body;
+  const { doctorName, specialty, poliName, poliId, days, hours, quotaPerDay, status, photoUrl, klasterNumber, klasterName, sipNumber, room } = req.body;
   if (!doctorName || !poliName) {
     res.status(400).json({ success: false, message: 'Nama Dokter dan Poli wajib diisi' });
     return;
@@ -247,11 +312,15 @@ app.post('/api/jadwal-dokter', (req, res) => {
     specialty: specialty || 'Dokter Umum / Penanggung Jawab',
     poliName,
     poliId: poliId || 'poli-umum',
+    klasterNumber: klasterNumber || 3,
+    klasterName: klasterName || 'Klaster 3: Usia Dewasa dan Lanjut Usia',
     days: daysArray,
     hours: hours || '08:00 - 12:00 WIB',
     quotaPerDay: Number(quotaPerDay) || 30,
     status: status || 'Hadir',
-    photoUrl: photoUrl || 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300'
+    photoUrl: photoUrl || '',
+    sipNumber: sipNumber || '',
+    room: room || 'Ruang Pemeriksaan'
   };
   doctorsStore.unshift(newDoctor);
   res.json({ success: true, message: 'Dokter berhasil ditambahkan', data: newDoctor });

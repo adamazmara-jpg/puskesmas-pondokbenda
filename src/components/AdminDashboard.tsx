@@ -46,12 +46,21 @@ import {
   Tv,
   Maximize2,
   Minimize2,
-  BrainCircuit
+  BrainCircuit,
+  ClipboardList,
+  FileSpreadsheet,
+  Pill
 } from 'lucide-react';
 import { PuskesmasLogo } from './PuskesmasLogo';
 import { PoliService, QueueTicket, DoctorSchedule, HealthArticle, QueueStatus, SurveySubmission } from '../types';
 import { INITIAL_POLIS, INITIAL_DOCTORS, INITIAL_ARTICLES } from '../data/mockData';
 import { ConfusionMatrixPage } from './ConfusionMatrixPage';
+import { RmeManagementPanel } from './RmeManagementPanel';
+import { PelayananMedisView } from './PelayananMedisView';
+import { ApotekerFarmasiView } from './ApotekerFarmasiView';
+import { PatientFlowPipelineBar } from './PatientFlowPipelineBar';
+import { ExportExcelModal } from './ExportExcelModal';
+import { SpreadsheetPasienRekap } from './SpreadsheetPasienRekap';
 
 interface AdminDashboardProps {
   polis: PoliService[];
@@ -80,8 +89,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   // Sidebar tab state
   const [activeMenu, setActiveMenu] = useState<
-    'dashboard' | 'monitor' | 'antrean' | 'dokter' | 'artikel' | 'layanan' | 'pesan' | 'testimoni' | 'cadangan' | 'confusion-matrix'
+    'dashboard' | 'monitor' | 'antrean' | 'google-sheet' | 'pelayanan-medis' | 'farmasi' | 'rme' | 'laporan' | 'dokter' | 'artikel' | 'layanan' | 'pesan' | 'testimoni' | 'cadangan' | 'confusion-matrix'
   >('dashboard');
+
+  const [isExportExcelOpen, setIsExportExcelOpen] = useState<boolean>(false);
 
   // TV Monitor View & Audio Call State
   const [isFullscreenTv, setIsFullscreenTv] = useState<boolean>(false);
@@ -181,16 +192,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Modal States for Add/Edit Doctor
   const [isDoctorModalOpen, setIsDoctorModalOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<DoctorSchedule | null>(null);
+  const [selectedDoctorKlaster, setSelectedDoctorKlaster] = useState<number | 'all'>('all');
   const [doctorForm, setDoctorForm] = useState({
     doctorName: '',
     specialty: 'Dokter Umum / Penanggung Jawab',
     poliName: 'Poli Umum',
     poliId: 'poli-umum',
+    klasterNumber: 3,
+    klasterName: 'Klaster 3: Usia Dewasa dan Lanjut Usia',
     days: 'Senin, Selasa, Rabu, Kamis, Jumat',
     hours: '08:00 - 12:00 WIB',
     quotaPerDay: 30,
     status: 'Hadir' as DoctorSchedule['status'],
-    photoUrl: ''
+    photoUrl: '',
+    sipNumber: '',
+    room: 'Ruang BPU / Pemeriksaan Umum'
   });
 
   // Modal States for Add/Edit Poliklinik & Layanan
@@ -344,14 +360,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setEditingDoctor(null);
     setDoctorForm({
       doctorName: '',
-      specialty: 'Dokter Umum / Spesialis',
+      specialty: 'Dokter Umum / Penanggung Jawab',
       poliName: polis[0]?.name || 'Poli Umum',
       poliId: polis[0]?.id || 'poli-umum',
-      days: 'Senin - Jumat',
+      klasterNumber: 3,
+      klasterName: 'Klaster 3: Usia Dewasa dan Lanjut Usia',
+      days: 'Senin, Selasa, Rabu, Kamis, Jumat',
       hours: '08:00 - 12:00 WIB',
       quotaPerDay: 30,
       status: 'Hadir' as DoctorSchedule['status'],
-      photoUrl: ''
+      photoUrl: '',
+      sipNumber: '446.1/045/SIP.D/DPMPTSP/2024',
+      room: 'Ruang BPU (Pemeriksaan Dewasa)'
     });
     setIsDoctorModalOpen(true);
   };
@@ -363,11 +383,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       specialty: doc.specialty || 'Dokter Umum',
       poliName: doc.poliName,
       poliId: doc.poliId,
+      klasterNumber: doc.klasterNumber || 3,
+      klasterName: doc.klasterName || 'Klaster 3: Usia Dewasa dan Lanjut Usia',
       days: Array.isArray(doc.days) ? doc.days.join(', ') : doc.days,
       hours: doc.hours || '08:00 - 12:00 WIB',
       quotaPerDay: doc.quotaPerDay || 30,
       status: doc.status || 'Hadir',
-      photoUrl: doc.photoUrl || ''
+      photoUrl: doc.photoUrl || '',
+      sipNumber: doc.sipNumber || '446.1/045/SIP.D/DPMPTSP/2024',
+      room: doc.room || 'Ruang Pemeriksaan'
     });
     setIsDoctorModalOpen(true);
   };
@@ -443,22 +467,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const emailInput = loginForm.email.toLowerCase().trim();
     const passwordInput = loginForm.password.trim();
 
-    if (!emailInput || !emailInput.includes('@')) {
-      setLoginError('Masukkan format alamat email yang valid.');
+    if (!emailInput) {
+      setLoginError('Masukkan email atau username resmi kedinasan.');
       return;
     }
 
     if (!passwordInput) {
-      setLoginError('Masukkan password akses.');
+      setLoginError('Masukkan password akses kedinasan.');
       return;
     }
 
-    // Determine role based on email or password, defaulting to admin
-    if (emailInput.includes('it') || passwordInput === 'it123') {
+    // List of allowed official staff & admin accounts
+    const isAdminAccount =
+      emailInput === 'admin@puskesmas.go.id' ||
+      emailInput === 'admin@puskesmas-pondokbenda.go.id' ||
+      emailInput === 'admin' ||
+      emailInput === 'ratna';
+
+    const isItAccount =
+      emailInput === 'superadmin@puskesmas.go.id' ||
+      emailInput === 'it@puskesmas-pondokbenda.go.id' ||
+      emailInput === 'it@puskesmas.go.id' ||
+      emailInput === 'it' ||
+      emailInput === 'superadmin' ||
+      emailInput === 'adam';
+
+    const isPetugasAccount =
+      emailInput === 'petugas@puskesmas.go.id' ||
+      emailInput === 'petugas@puskesmas-pondokbenda.go.id' ||
+      emailInput === 'petugas' ||
+      emailInput === 'budi';
+
+    if (!isAdminAccount && !isItAccount && !isPetugasAccount) {
+      setLoginError(
+        `🚫 AKSES DITOLAK: Akun "${loginForm.email}" BUKAN merupakan Pegawai / Staff / Admin Resmi Puskesmas Pondok Benda. Portal ini terenkripsi khusus untuk Petugas Loket, Dokter, dan Administrator Internal. Masyarakat/Pasien tidak diizinkan masuk ke portal ini.`
+      );
+      return;
+    }
+
+    // Check valid password
+    const validPasswords = ['password', '123456', 'admin123', 'it123', 'petugas123'];
+    if (!validPasswords.includes(passwordInput)) {
+      setLoginError('⚠️ Password kedinasan salah. Silakan periksa kembali password Anda.');
+      return;
+    }
+
+    if (isItAccount) {
       setCurrentUserRole('it');
     } else {
       setCurrentUserRole('admin');
     }
+
     setIsAuthenticated(true);
   };
 
@@ -698,70 +757,86 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 font-sans relative overflow-hidden">
-        {/* Background glow effects */}
+      <div className="min-h-screen bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 font-sans relative overflow-hidden">
+        {/* Subtle decorative glow */}
         <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden relative z-10">
+        <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-200/90 overflow-hidden relative z-10">
           
-          {/* Header */}
-          <div className="p-7 bg-slate-900 text-white space-y-3 relative">
+          {/* Header (Clean & Transparent) */}
+          <div className="p-6 sm:p-7 bg-transparent border-b border-slate-100 space-y-2 relative">
             <button
               onClick={onCloseAdmin}
-              className="absolute top-5 right-5 p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl transition"
+              className="absolute top-5 right-5 p-2 bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 rounded-xl transition"
               title="Kembali ke Beranda"
             >
               <X className="w-4 h-4" />
             </button>
 
             <div className="flex items-center gap-3">
-              <PuskesmasLogo className="w-10 h-10 shrink-0" />
+              <PuskesmasLogo className="w-10 h-10 shrink-0 drop-shadow-xs" />
               <div>
-                <span className="text-[10px] font-extrabold uppercase text-amber-400 tracking-wider block">
+                <span className="text-[10px] font-extrabold uppercase text-emerald-700 tracking-wider block">
                   SISTEM OTENTIKASI RESMI
                 </span>
-                <h2 className="text-xl font-black text-white">Login Admin & IT</h2>
+                <h2 className="text-xl font-black text-slate-900">Login Admin & IT</h2>
               </div>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               Masukkan email dan password resmi petugas untuk mengakses Panel Manajemen Puskesmas.
             </p>
           </div>
 
-          <form onSubmit={handleLogin} className="p-7 space-y-4">
+          <form onSubmit={handleLogin} className="p-6 sm:p-7 space-y-4">
             
+            {/* Restricted Notice */}
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
+              <div className="font-bold flex items-center gap-1.5 text-amber-900">
+                <ShieldCheck className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                <span>Khusus Pegawai / Administrator Resmi</span>
+              </div>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                Pasien / Masyarakat <strong>TIDAK DAPAT DAFTAR</strong> sebagai akun admin/staff. Hanya akun terdaftar yang berhak masuk.
+              </p>
+            </div>
+
             {loginError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-bold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{loginError}</span>
+              <div className="p-4 bg-rose-50 border border-rose-300 rounded-xl space-y-2">
+                <div className="flex items-start gap-2 text-xs text-rose-900 font-bold">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>Peringatan Keamanan Otentikasi</span>
+                </div>
+                <p className="text-[11px] text-rose-800 leading-relaxed font-medium">
+                  {loginError}
+                </p>
               </div>
             )}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Alamat Email
+                Alamat Email / Username Resmi
               </label>
               <input
-                type="email"
+                type="text"
                 required
                 value={loginForm.email}
                 onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                placeholder="Masukkan alamat email resmi"
+                placeholder="Masukkan email"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Password Akses
+                Masukkan Password
               </label>
               <input
                 type="password"
                 required
                 value={loginForm.password}
                 onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                placeholder="••••••••"
+                placeholder="Masukkan password"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
             </div>
@@ -1061,12 +1136,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* Navigation Items Organized by Categories */}
           <nav className="p-3 space-y-4">
             
-            {/* CATEGORY 1: UTAMA & ANTREAN */}
+            {/* CATEGORY 1: RINGKASAN & ANTREAN */}
             <div className="space-y-1">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-3 block">
                 Ringkasan & Antrean
               </span>
 
+              {/* Dashboard Utama */}
               <button
                 onClick={() => setActiveMenu('dashboard')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
@@ -1079,6 +1155,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>Dashboard Utama</span>
               </button>
 
+              {/* LOKET */}
               <button
                 onClick={() => setActiveMenu('antrean')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
@@ -1089,15 +1166,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               >
                 <div className="flex items-center gap-3">
                   <ListOrdered className="w-4 h-4 shrink-0" />
-                  <span>Daftar Pasien & Antrean</span>
+                  <span>Loket Pendaftaran</span>
                 </div>
-                {tickets.filter(t => t.status === 'Waiting').length > 0 && (
+                {tickets.filter(t => t.status === 'Waiting').length > 0 ? (
                   <span className="px-1.5 py-0.5 bg-amber-500 text-white text-[10px] font-extrabold rounded-full">
                     {tickets.filter(t => t.status === 'Waiting').length}
+                  </span>
+                ) : (
+                  <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded">
+                    Loket
                   </span>
                 )}
               </button>
 
+              {/* GOOGLE SHEET REKAP PASIEN (NEW) */}
+              <button
+                onClick={() => setActiveMenu('google-sheet')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+                  activeMenu === 'google-sheet'
+                    ? 'bg-yellow-500 text-slate-900 shadow-xs ring-2 ring-yellow-400/40'
+                    : 'text-slate-700 hover:bg-yellow-50/60'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <FileSpreadsheet className="w-4 h-4 shrink-0 text-emerald-700" />
+                  <span>Sheet Rekap Pasien</span>
+                </div>
+                <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-900 border border-yellow-300 text-[10px] font-extrabold rounded-full">
+                  Live
+                </span>
+              </button>
+
+              {/* DOKTER */}
+              <button
+                onClick={() => setActiveMenu('pelayanan-medis')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+                  activeMenu === 'pelayanan-medis'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Stethoscope className="w-4 h-4 shrink-0" />
+                  <span>Pemeriksaan Dokter</span>
+                </div>
+                <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full border ${
+                  activeMenu === 'pelayanan-medis'
+                    ? 'bg-white/20 text-white border-white/30'
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                }`}>
+                  e-Resep
+                </span>
+              </button>
+
+              {/* APOTEKER */}
+              <button
+                onClick={() => setActiveMenu('farmasi')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+                  activeMenu === 'farmasi'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Pill className="w-4 h-4 shrink-0" />
+                  <span>Farmasi & Apoteker</span>
+                </div>
+                <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded-full border ${
+                  activeMenu === 'farmasi'
+                    ? 'bg-white/20 text-white border-white/30'
+                    : 'bg-teal-50 text-teal-700 border-teal-200'
+                }`}>
+                  Obat
+                </span>
+              </button>
+
+              {/* Confusion Matrix */}
               <button
                 onClick={() => setActiveMenu('confusion-matrix')}
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
@@ -1110,11 +1254,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <BrainCircuit className="w-4 h-4 shrink-0 text-emerald-500" />
                   <span>Confusion Matrix ML</span>
                 </div>
-                <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full border border-emerald-300">
+                <span className={`px-1.5 py-0.5 text-[10px] font-black rounded-full border ${
+                  activeMenu === 'confusion-matrix'
+                    ? 'bg-white/20 text-white border-white/30'
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                }`}>
                   Evaluasi
                 </span>
               </button>
 
+              {/* Monitor TV */}
               <button
                 onClick={() => setActiveMenu('monitor')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
@@ -1135,6 +1284,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </span>
 
               <button
+                onClick={() => setActiveMenu('rme')}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+                  activeMenu === 'rme'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <ClipboardList className="w-4 h-4 shrink-0" />
+                  <span>Rekam Medis (RME)</span>
+                </div>
+                <span className={`px-1.5 py-0.5 text-[10px] font-black rounded-full border ${
+                  activeMenu === 'rme'
+                    ? 'bg-white/20 text-white border-white/30'
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                }`}>
+                  SOAP
+                </span>
+              </button>
+            </div>
+
+            {/* CATEGORY 3: MASTER DATA & POLIKLINIK */}
+            <div className="space-y-1 pt-1 border-t border-slate-100">
+              <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-3 pt-2 block">
+                Master Layanan & Dokter
+              </span>
+
+              <button
                 onClick={() => setActiveMenu('layanan')}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
                   activeMenu === 'layanan'
@@ -1142,7 +1319,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                <Stethoscope className="w-4 h-4 shrink-0" />
+                <Building2 className="w-4 h-4 shrink-0" />
                 <span>Layanan Poliklinik</span>
               </button>
 
@@ -1212,8 +1389,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {/* CATEGORY 4: PENGATURAN & SISTEM */}
             <div className="space-y-1 pt-1 border-t border-slate-100">
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 px-3 pt-2 block">
-                Sistem & Keamanan
+                Sistem & Laporan
               </span>
+
+              <button
+                onClick={() => setIsExportExcelOpen(true)}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition"
+              >
+                <div className="flex items-center gap-3">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-700 shrink-0" />
+                  <span>Export Excel (.xlsx)</span>
+                </div>
+                <Download className="w-3.5 h-3.5 text-emerald-700" />
+              </button>
 
               <button
                 onClick={() => setActiveMenu('cadangan')}
@@ -1251,14 +1439,47 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <div className="space-y-8">
             
             {/* Header Title */}
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                Dashboard
-              </h2>
-              <p className="text-xs text-slate-500 font-medium mt-1">
-                Ringkasan aktivitas Puskesmas Pondok Benda
-              </p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                  Dashboard
+                </h2>
+                <p className="text-xs text-slate-500 font-medium mt-1">
+                  Ringkasan aktivitas Puskesmas Pondok Benda & Alur Pelayanan Pasien
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setActiveMenu('antrean')}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+                >
+                  <ListOrdered className="w-3.5 h-3.5" />
+                  <span>1. Loket</span>
+                </button>
+                <button
+                  onClick={() => setActiveMenu('pelayanan-medis')}
+                  className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+                >
+                  <Stethoscope className="w-3.5 h-3.5" />
+                  <span>2. Dokter (e-Resep)</span>
+                </button>
+                <button
+                  onClick={() => setActiveMenu('farmasi')}
+                  className="px-3.5 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+                >
+                  <Pill className="w-3.5 h-3.5" />
+                  <span>3. Farmasi / Apoteker</span>
+                </button>
+              </div>
             </div>
+
+            {/* 3-STEP PATIENT FLOW PIPELINE BAR */}
+            <PatientFlowPipelineBar
+              currentStage="loket"
+              onSelectStage={(st) => setActiveMenu(st === 'loket' ? 'antrean' : st === 'dokter' ? 'pelayanan-medis' : 'farmasi')}
+              tickets={tickets}
+            />
 
             {/* 5 KPI Stat Cards Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1519,16 +1740,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* VIEW 3: DOKTER MANAGEMENT ("agar bisa menambahkan atau mengganti") */}
+        {/* VIEW 3: DOKTER MANAGEMENT - DISESUAIKAN BERDASARKAN KLASTER ILP */}
         {activeMenu === 'dokter' && (
           <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
               <div>
-                <h2 className="text-2xl font-extrabold text-slate-900">
-                  Kelola Jadwal & Status Dokter
-                </h2>
-                <p className="text-xs text-slate-500">
-                  Atur daftar dokter bertugas, jadwal praktik, serta status kehadiran harian
+                <div className="flex items-center gap-2">
+                  <h2 className="text-2xl font-extrabold text-slate-900">
+                    Jadwal & Tim Dokter Berdasarkan Klaster ILP
+                  </h2>
+                  <span className="px-2.5 py-0.5 bg-teal-100 text-teal-800 text-[11px] font-extrabold rounded-full">
+                    {doctors.length} Dokter Terdaftar
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Pengelompokan tim dokter dan tenaga medis sesuai Integrasi Layanan Primer (ILP) Kemenkes RI (Klaster 1 s/d 4 & Lintas Klaster)
                 </p>
               </div>
 
@@ -1541,106 +1767,356 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </button>
             </div>
 
-            {/* Doctor Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {doctors.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs space-y-4 hover:border-emerald-300 transition"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-slate-100 overflow-hidden shrink-0 border border-slate-200 flex items-center justify-center text-slate-400">
-                        {doc.photoUrl ? (
-                          <img
-                            src={doc.photoUrl}
-                            alt={doc.doctorName}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <User className="w-6 h-6 text-slate-400" />
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-extrabold text-slate-900 text-sm">{doc.doctorName}</h3>
-                        <span className="text-xs font-bold text-emerald-700 block mt-0.5">{doc.poliName}</span>
-                      </div>
-                    </div>
+            {/* Klaster Filter Pills */}
+            <div className="flex flex-wrap gap-2 pt-1 pb-1">
+              {[
+                { key: 'all' as const, label: 'Semua Klaster', count: doctors.length, color: 'hover:bg-slate-100' },
+                { key: 1, label: 'Klaster 1 (Manajemen)', count: doctors.filter(d => (d.klasterNumber || 3) === 1).length, color: 'hover:bg-blue-50' },
+                { key: 2, label: 'Klaster 2 (Ibu & Anak)', count: doctors.filter(d => (d.klasterNumber || 3) === 2).length, color: 'hover:bg-pink-50' },
+                { key: 3, label: 'Klaster 3 (Dewasa & Lansia)', count: doctors.filter(d => (d.klasterNumber || 3) === 3).length, color: 'hover:bg-emerald-50' },
+                { key: 4, label: 'Klaster 4 (Penyakit Menular)', count: doctors.filter(d => (d.klasterNumber || 3) === 4).length, color: 'hover:bg-amber-50' },
+                { key: 5, label: 'Lintas Klaster (Gigi/UGD/Penunjang)', count: doctors.filter(d => (d.klasterNumber || 3) === 5).length, color: 'hover:bg-purple-50' },
+              ].map((item) => {
+                const isActive = selectedDoctorKlaster === item.key;
+                return (
+                  <button
+                    key={item.key.toString()}
+                    onClick={() => setSelectedDoctorKlaster(item.key)}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition flex items-center gap-2 border ${
+                      isActive
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                        : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <span>{item.label}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-800'
+                    }`}>
+                      {item.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
 
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                        doc.status === 'Ada' || doc.status === 'Praktik'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-rose-100 text-rose-800'
-                      }`}
-                    >
-                      {doc.status}
+            {/* Klaster Definition Guide Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              {[
+                {
+                  num: 1,
+                  title: 'Klaster 1: Manajemen',
+                  desc: 'Ketatausahaan, Mutu & Pelayanan Publik',
+                  badgeColor: 'bg-blue-50 border-blue-200 text-blue-900',
+                  iconColor: 'text-blue-600',
+                  count: doctors.filter(d => (d.klasterNumber || 3) === 1).length
+                },
+                {
+                  num: 2,
+                  title: 'Klaster 2: Ibu & Anak',
+                  desc: 'KIA, Imunisasi, MTBS, KB & Remaja',
+                  badgeColor: 'bg-pink-50 border-pink-200 text-pink-900',
+                  iconColor: 'text-pink-600',
+                  count: doctors.filter(d => (d.klasterNumber || 3) === 2).length
+                },
+                {
+                  num: 3,
+                  title: 'Klaster 3: Dewasa & Lansia',
+                  desc: 'Penyakit Tidak Menular (PTM), Jiwa & Geriatri',
+                  badgeColor: 'bg-emerald-50 border-emerald-200 text-emerald-900',
+                  iconColor: 'text-emerald-600',
+                  count: doctors.filter(d => (d.klasterNumber || 3) === 3).length
+                },
+                {
+                  num: 4,
+                  title: 'Klaster 4: P2M & ISPA',
+                  desc: 'TB Paru, Kusta, DBD & Penyakit Menular',
+                  badgeColor: 'bg-amber-50 border-amber-200 text-amber-900',
+                  iconColor: 'text-amber-600',
+                  count: doctors.filter(d => (d.klasterNumber || 3) === 4).length
+                },
+                {
+                  num: 5,
+                  title: 'Lintas Klaster',
+                  desc: 'Kesehatan Gigi & Mulut, UGD 24 Jam, Farmasi & Lab',
+                  badgeColor: 'bg-purple-50 border-purple-200 text-purple-900',
+                  iconColor: 'text-purple-600',
+                  count: doctors.filter(d => (d.klasterNumber || 3) === 5).length
+                }
+              ].map((k) => (
+                <div
+                  key={k.num}
+                  onClick={() => setSelectedDoctorKlaster(selectedDoctorKlaster === k.num ? 'all' : k.num)}
+                  className={`p-3 rounded-2xl border transition cursor-pointer text-left ${k.badgeColor} ${
+                    selectedDoctorKlaster === k.num ? 'ring-2 ring-slate-900 shadow-sm' : 'hover:scale-[1.02]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-wider">
+                      Klaster {k.num === 5 ? 'Lintas' : k.num}
+                    </span>
+                    <span className="text-xs font-black px-2 py-0.5 bg-white rounded-md border border-slate-200/50 shadow-2xs">
+                      {k.count} Medis
                     </span>
                   </div>
-
-                  <div className="space-y-1 text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 font-medium">
-                    <div className="flex items-center justify-between">
-                      <span>Spesialisasi:</span>
-                      <span className="font-bold text-slate-800">{doc.specialty}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Hari Praktik:</span>
-                      <span className="font-bold text-slate-800">
-                        {Array.isArray(doc.days) ? doc.days.join(', ') : doc.days}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Jam Layanan:</span>
-                      <span className="font-bold text-slate-800">{doc.hours}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Kuota Harian:</span>
-                      <span className="font-bold text-emerald-700">{doc.quotaPerDay} Pasien</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
-                    <button
-                      onClick={() => handleOpenEditDoctor(doc)}
-                      className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs rounded-lg border border-amber-200 transition flex items-center gap-1"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      <span>Edit</span>
-                    </button>
-                    <button
-                      onClick={() => handleDeleteDoctor(doc.id)}
-                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition flex items-center gap-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Hapus</span>
-                    </button>
-                  </div>
+                  <h4 className="font-extrabold text-xs mt-1 text-slate-900 leading-tight">
+                    {k.title}
+                  </h4>
+                  <p className="text-[10px] text-slate-600 mt-1 line-clamp-2 leading-snug">
+                    {k.desc}
+                  </p>
                 </div>
               ))}
             </div>
+
+            {/* Doctor Grid (Filtered by Klaster) */}
+            {(() => {
+              const filteredDoctors = doctors.filter(doc => {
+                if (selectedDoctorKlaster === 'all') return true;
+                return (doc.klasterNumber || 3) === selectedDoctorKlaster;
+              });
+
+              if (filteredDoctors.length === 0) {
+                return (
+                  <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 text-slate-400 space-y-3">
+                    <User className="w-12 h-12 mx-auto text-slate-300" />
+                    <p className="font-extrabold text-sm text-slate-600">Belum ada dokter di klaster ini</p>
+                    <p className="text-xs text-slate-400">Klik "Tambah Dokter Baru" untuk mendaftarkan dokter ke klaster ini.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredDoctors.map((doc) => {
+                    const klasterNum = doc.klasterNumber || 3;
+                    const klasterBadgeStyle =
+                      klasterNum === 1 ? 'bg-blue-100 text-blue-900 border-blue-300' :
+                      klasterNum === 2 ? 'bg-pink-100 text-pink-900 border-pink-300' :
+                      klasterNum === 3 ? 'bg-emerald-100 text-emerald-900 border-emerald-300' :
+                      klasterNum === 4 ? 'bg-amber-100 text-amber-900 border-amber-300' :
+                      'bg-purple-100 text-purple-900 border-purple-300';
+
+                    return (
+                      <div
+                        key={doc.id}
+                        className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-2xs space-y-4 hover:border-emerald-400 hover:shadow-md transition"
+                      >
+                        {/* Klaster Tag & Status */}
+                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+                          <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${klasterBadgeStyle}`}>
+                            {doc.klasterName ? doc.klasterName.split(':')[0] : `Klaster ${klasterNum}`}
+                          </span>
+
+                          <span
+                            className={`px-2.5 py-0.5 rounded text-[10px] font-black uppercase ${
+                              doc.status === 'Hadir'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : doc.status === 'Pengganti'
+                                ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                                : 'bg-rose-100 text-rose-800 border border-rose-300'
+                            }`}
+                          >
+                            {doc.status}
+                          </span>
+                        </div>
+
+                        {/* Doctor Profile Info */}
+                        <div className="flex items-start gap-3.5">
+                          {(() => {
+                            const kNum = doc.klasterNumber || 3;
+                            const kAvatarBg =
+                              kNum === 1 ? 'bg-blue-50 border-blue-200 text-blue-600' :
+                              kNum === 2 ? 'bg-pink-50 border-pink-200 text-pink-600' :
+                              kNum === 3 ? 'bg-emerald-50 border-emerald-200 text-emerald-600' :
+                              kNum === 4 ? 'bg-amber-50 border-amber-200 text-amber-600' :
+                              'bg-purple-50 border-purple-200 text-purple-600';
+
+                            return (
+                              <div className={`w-14 h-14 rounded-2xl overflow-hidden shrink-0 border flex items-center justify-center shadow-2xs ${doc.photoUrl ? 'bg-slate-100 border-slate-200' : kAvatarBg}`}>
+                                {doc.photoUrl ? (
+                                  <img
+                                    src={doc.photoUrl}
+                                    alt={doc.doctorName}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <User className="w-7 h-7" />
+                                )}
+                              </div>
+                            );
+                          })()}
+                          <div>
+                            <h3 className="font-extrabold text-slate-900 text-sm leading-snug">
+                              {doc.doctorName}
+                            </h3>
+                            <span className="text-xs font-bold text-teal-800 block mt-0.5">
+                              {doc.specialty || 'Dokter Umum'}
+                            </span>
+                            <span className="text-[11px] font-semibold text-slate-500 block">
+                              Unit: <strong>{doc.poliName}</strong>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Details Card */}
+                        <div className="space-y-1.5 text-xs text-slate-600 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100 font-medium">
+                          {doc.room && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-500">Ruangan:</span>
+                              <span className="font-bold text-slate-800 text-[11px]">{doc.room}</span>
+                            </div>
+                          )}
+                          {doc.sipNumber && (
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-500">No. SIP:</span>
+                              <span className="font-semibold text-slate-700 text-[10px] truncate max-w-[160px]" title={doc.sipNumber}>
+                                {doc.sipNumber}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">Hari Praktik:</span>
+                            <span className="font-bold text-slate-800">
+                              {Array.isArray(doc.days) ? doc.days.join(', ') : doc.days}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500">Jam Layanan:</span>
+                            <span className="font-bold text-slate-800">{doc.hours}</span>
+                          </div>
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                            <span className="text-slate-500">Kuota Harian:</span>
+                            <span className="font-extrabold text-emerald-700">{doc.quotaPerDay || 30} Pasien / Hari</span>
+                          </div>
+                        </div>
+
+                        {/* Presensi Cepat Daftar Hadir */}
+                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-1">
+                          <span className="text-[10px] font-bold text-slate-600">Presensi:</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={async () => {
+                                setDoctors(prev => prev.map(d => d.id === doc.id ? { ...d, status: 'Hadir' } : d));
+                                try {
+                                  await fetch(`/api/jadwal-dokter/${doc.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ status: 'Hadir' })
+                                  });
+                                } catch {}
+                              }}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded transition ${
+                                doc.status === 'Hadir'
+                                  ? 'bg-emerald-600 text-white shadow-2xs'
+                                  : 'bg-white text-slate-600 hover:bg-emerald-50 border border-slate-200'
+                              }`}
+                            >
+                              Hadir
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setDoctors(prev => prev.map(d => d.id === doc.id ? { ...d, status: 'Pengganti' } : d));
+                                try {
+                                  await fetch(`/api/jadwal-dokter/${doc.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ status: 'Pengganti' })
+                                  });
+                                } catch {}
+                              }}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded transition ${
+                                doc.status === 'Pengganti'
+                                  ? 'bg-blue-600 text-white shadow-2xs'
+                                  : 'bg-white text-slate-600 hover:bg-blue-50 border border-slate-200'
+                              }`}
+                            >
+                              Pengganti
+                            </button>
+                            <button
+                              onClick={async () => {
+                                setDoctors(prev => prev.map(d => d.id === doc.id ? { ...d, status: 'Cuti' } : d));
+                                try {
+                                  await fetch(`/api/jadwal-dokter/${doc.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ status: 'Cuti' })
+                                  });
+                                } catch {}
+                              }}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded transition ${
+                                doc.status === 'Cuti'
+                                  ? 'bg-rose-600 text-white shadow-2xs'
+                                  : 'bg-white text-slate-600 hover:bg-rose-50 border border-slate-200'
+                              }`}
+                            >
+                              Cuti
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                          <button
+                            onClick={() => handleOpenEditDoctor(doc)}
+                            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs rounded-lg border border-amber-200 transition flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                            <span>Edit Dokter</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDoctor(doc.id)}
+                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Hapus</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
-        {/* VIEW 4: ANTREAN MANAGEMENT */}
+        {/* VIEW 4: ANTREAN MANAGEMENT (POV LOKET PENDAFTARAN) */}
         {activeMenu === 'antrean' && (
           <div className="space-y-6">
+
+            {/* 3-STEP PATIENT FLOW PIPELINE BAR */}
+            <PatientFlowPipelineBar
+              currentStage="loket"
+              onSelectStage={(st) => setActiveMenu(st === 'loket' ? 'antrean' : st === 'dokter' ? 'pelayanan-medis' : 'farmasi')}
+              tickets={tickets}
+            />
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
               <div>
                 <h2 className="text-2xl font-extrabold text-slate-900">
-                  Pemanggilan & Manajemen Antrean Loket
+                  Loket Pendaftaran & Verifikasi
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Panggil antrean, update status pasien, dan cetak tiket walk-in
+                  Tahap 1: Verifikasi data pasien, panggil nomor loket, dan teruskan antrean ke Ruang Pemeriksaan Dokter.
                 </p>
               </div>
 
-              <button
-                onClick={() => setActiveMenu('confusion-matrix')}
-                className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-md border border-slate-800 transition flex items-center gap-2.5 shrink-0"
-              >
-                <BrainCircuit className="w-4 h-4 text-emerald-400 animate-pulse" />
-                <span>Uji Confusion Matrix Model AI</span>
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setActiveMenu('pelayanan-medis')}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-2"
+                >
+                  <Stethoscope className="w-4 h-4" />
+                  <span>Buka Pemeriksaan Dokter ➔</span>
+                </button>
+
+                <button
+                  onClick={() => setActiveMenu('confusion-matrix')}
+                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-md border border-slate-800 transition flex items-center gap-2.5 shrink-0"
+                >
+                  <BrainCircuit className="w-4 h-4 text-emerald-400 animate-pulse" />
+                  <span>Uji Confusion Matrix Model AI</span>
+                </button>
+              </div>
             </div>
 
             {/* Caller Header Card */}
@@ -2768,7 +3244,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <ConfusionMatrixPage onBack={() => setActiveMenu('antrean')} />
         )}
 
+        {/* VIEW: GOOGLE SHEET REKAP PENDAFTARAN PASIEN */}
+        {activeMenu === 'google-sheet' && (
+          <SpreadsheetPasienRekap
+            tickets={tickets}
+            onRefresh={onRefresh}
+            onUpdateStatus={onUpdateStatus}
+          />
+        )}
+
+        {/* VIEW: REKAM MEDIS ELEKTRONIK (RME) */}
+        {activeMenu === 'rme' && (
+          <RmeManagementPanel polis={polis} />
+        )}
+
+        {/* VIEW: PELAYANAN & MEDIS (DOKTER) */}
+        {activeMenu === 'pelayanan-medis' && (
+          <PelayananMedisView
+            polis={polis}
+            tickets={tickets}
+            doctors={doctors}
+            onUpdateTicketStatus={onUpdateStatus}
+            onRefresh={onRefresh}
+            onNavigateFlow={(st) => setActiveMenu(st === 'loket' ? 'antrean' : st === 'dokter' ? 'pelayanan-medis' : 'farmasi')}
+          />
+        )}
+
+        {/* VIEW: INSTALASI FARMASI & APOTEKER (e-RESEP) */}
+        {activeMenu === 'farmasi' && (
+          <ApotekerFarmasiView
+            tickets={tickets}
+            onNavigateFlow={(st) => setActiveMenu(st === 'loket' ? 'antrean' : st === 'dokter' ? 'pelayanan-medis' : 'farmasi')}
+          />
+        )}
+
       </main>
+
+      {/* MODAL: EXPORT EXCEL LAPORAN */}
+      <ExportExcelModal
+        isOpen={isExportExcelOpen}
+        onClose={() => setIsExportExcelOpen(false)}
+        tickets={tickets}
+        polis={polis}
+      />
 
       {/* MODAL: ADD / EDIT ARTICLE */}
       {isArticleModalOpen && (
@@ -3046,9 +3564,42 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
+              {/* Klaster ILP Selector */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Klaster ILP (Integrasi Layanan Primer Kemenkes) <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={doctorForm.klasterNumber}
+                  onChange={(e) => {
+                    const num = Number(e.target.value);
+                    const kMap: Record<number, string> = {
+                      1: 'Klaster 1: Manajemen & Tata Kelola',
+                      2: 'Klaster 2: Ibu, Anak, dan Remaja',
+                      3: 'Klaster 3: Usia Dewasa dan Lanjut Usia',
+                      4: 'Klaster 4: Penanggulangan Penyakit Menular',
+                      5: 'Lintas Klaster: Gigi, UGD & Penunjang'
+                    };
+                    setDoctorForm({
+                      ...doctorForm,
+                      klasterNumber: num,
+                      klasterName: kMap[num] || 'Klaster 3: Usia Dewasa dan Lanjut Usia'
+                    });
+                  }}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
+                >
+                  <option value={1}>Klaster 1: Manajemen & Tata Kelola (Ketatausahaan & Mutu)</option>
+                  <option value={2}>Klaster 2: Ibu, Anak, dan Remaja (KIA, Imunisasi, MTBS, KB)</option>
+                  <option value={3}>Klaster 3: Usia Dewasa & Lansia (PTM, Skrining, Jiwa, Geriatri)</option>
+                  <option value={4}>Klaster 4: Penanggulangan Penyakit Menular (TB, Kusta, DBD, ISPA)</option>
+                  <option value={5}>Lintas Klaster (Gigi & Mulut, UGD 24 Jam, Farmasi, Lab)</option>
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">Dokter akan otomatis dikelompokkan dalam klaster pelayanan ini.</p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Poliklinik</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Poliklinik / Unit</label>
                   <select
                     value={doctorForm.poliId}
                     onChange={(e) => {
@@ -3078,6 +3629,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <option value="Pengganti">Dokter Pengganti</option>
                     <option value="Cuti">Cuti / Tidak Hadir</option>
                   </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Ruangan Praktik</label>
+                  <input
+                    type="text"
+                    value={doctorForm.room}
+                    onChange={(e) => setDoctorForm({ ...doctorForm, room: e.target.value })}
+                    placeholder="Contoh: Ruang BPU / Lt. 1 R-102"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nomor SIP Dokter</label>
+                  <input
+                    type="text"
+                    value={doctorForm.sipNumber}
+                    onChange={(e) => setDoctorForm({ ...doctorForm, sipNumber: e.target.value })}
+                    placeholder="446.1/045/SIP.D/2024"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
+                  />
                 </div>
               </div>
 

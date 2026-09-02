@@ -47,7 +47,7 @@ export const Hero: React.FC<HeroProps> = ({
             <div>
               <div className="inline-flex items-center gap-2 bg-emerald-50 text-emerald-800 text-xs font-semibold px-4 py-1.5 rounded-full border border-emerald-200/80 shadow-2xs">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Buka: Senin–Jumat 08.00–14.00 WIB · IGD 24 Jam</span>
+                <span>Jam Pelayanan: Senin–Kamis 08.00–14.00 WIB · Jumat 08.00–11.30 WIB · Sabtu 08.00–12.30 WIB</span>
               </div>
             </div>
 

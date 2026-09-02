@@ -14,7 +14,8 @@ import {
   Menu,
   Award,
   Info,
-  Newspaper
+  Newspaper,
+  ListOrdered
 } from 'lucide-react';
 import { PuskesmasLogo } from './PuskesmasLogo';
 import { PoliService, DoctorSchedule, HealthArticle } from '../types';

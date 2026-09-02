@@ -34,10 +34,18 @@ import {
   EyeOff,
   Download,
   Printer,
-  BrainCircuit
+  BrainCircuit,
+  ClipboardList,
+  Stethoscope,
+  Pill
 } from 'lucide-react';
-import { PoliService, QueueTicket, QueueStatus, SurveyStats, SurveySubmission } from '../types';
+import { PoliService, QueueTicket, QueueStatus, SurveyStats, SurveySubmission, DoctorSchedule } from '../types';
 import { ConfusionMatrixPage } from './ConfusionMatrixPage';
+import { RmeManagementPanel } from './RmeManagementPanel';
+import { PelayananMedisView } from './PelayananMedisView';
+import { ApotekerFarmasiView } from './ApotekerFarmasiView';
+import { ExportExcelModal } from './ExportExcelModal';
+import { SpreadsheetPasienRekap } from './SpreadsheetPasienRekap';
 
 interface UserRole {
   username: string;
@@ -72,6 +80,39 @@ const PRESET_USERS: Record<string, { pass: string; user: UserRole }> = {
     },
   },
   'superadmin@puskesmas.go.id': {
+    pass: 'password',
+    user: {
+      username: 'superadmin@puskesmas.go.id',
+      name: 'Super Administrator IT',
+      role: 'it',
+      roleName: 'Super Admin & System Administrator',
+      department: 'Divisi Teknologi Informasi Dinkes',
+      avatarBg: 'bg-purple-700',
+    },
+  },
+  'petugas@puskesmas-pondokbenda.go.id': {
+    pass: 'password',
+    user: {
+      username: 'petugas@puskesmas.go.id',
+      name: 'Budi Santoso, Amd.Kep',
+      role: 'petugas',
+      roleName: 'Petugas Loket & Poliklinik',
+      department: 'Loket Pendaftaran Utama',
+      avatarBg: 'bg-emerald-700',
+    },
+  },
+  'admin@puskesmas-pondokbenda.go.id': {
+    pass: 'password',
+    user: {
+      username: 'admin@puskesmas.go.id',
+      name: 'Dr. Hj. Ratna Sari, M.Kes',
+      role: 'admin',
+      roleName: 'Administrator Manajemen Puskesmas',
+      department: 'Kepala Tata Usaha & Mutu',
+      avatarBg: 'bg-blue-700',
+    },
+  },
+  'it@puskesmas-pondokbenda.go.id': {
     pass: 'password',
     user: {
       username: 'superadmin@puskesmas.go.id',
@@ -150,8 +191,9 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
   const [showPass, setShowPass] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  // Active subtab inside dashboard: 'loket' | 'pasien' | 'ikm' | 'dokter' | 'system_it' | 'confusion-matrix'
-  const [activeSubTab, setActiveSubTab] = useState<'loket' | 'pasien' | 'ikm' | 'dokter' | 'system_it' | 'confusion-matrix'>('loket');
+  // Active subtab inside dashboard: 'loket' | 'sheet' | 'pelayanan-medis' | 'farmasi' | 'pasien' | 'rme' | 'ikm' | 'dokter' | 'system_it' | 'confusion-matrix'
+  const [activeSubTab, setActiveSubTab] = useState<'loket' | 'sheet' | 'pelayanan-medis' | 'farmasi' | 'pasien' | 'rme' | 'ikm' | 'dokter' | 'system_it' | 'confusion-matrix'>('loket');
+  const [isExportExcelOpen, setIsExportExcelOpen] = useState<boolean>(false);
 
   // Queue caller states
   const [selectedPoliId, setSelectedPoliId] = useState<string>(polis[0]?.id || 'poli-umum');
@@ -196,13 +238,20 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
     let found = PRESET_USERS[targetKey];
 
     if (!found) {
-      if (targetKey.includes('admin') || targetKey.includes('ratna')) {
-        found = PRESET_USERS['admin@puskesmas-pondokbenda.go.id'];
-      } else if (targetKey.includes('it') || targetKey.includes('adam')) {
-        found = PRESET_USERS['it@puskesmas-pondokbenda.go.id'];
-      } else if (targetKey.includes('petugas') || targetKey.includes('budi') || targetKey.includes('@')) {
-        found = PRESET_USERS['petugas@puskesmas-pondokbenda.go.id'];
+      if (targetKey === 'admin' || targetKey === 'ratna' || targetKey === 'admin@puskesmas.go.id' || targetKey === 'admin@puskesmas-pondokbenda.go.id') {
+        found = PRESET_USERS['admin@puskesmas.go.id'];
+      } else if (targetKey === 'it' || targetKey === 'superadmin' || targetKey === 'adam' || targetKey === 'superadmin@puskesmas.go.id' || targetKey === 'it@puskesmas-pondokbenda.go.id') {
+        found = PRESET_USERS['superadmin@puskesmas.go.id'];
+      } else if (targetKey === 'petugas' || targetKey === 'budi' || targetKey === 'petugas@puskesmas.go.id' || targetKey === 'petugas@puskesmas-pondokbenda.go.id') {
+        found = PRESET_USERS['petugas@puskesmas.go.id'];
       }
+    }
+
+    if (!found) {
+      setLoginError(
+        `🚫 AKSES DITOLAK: Akun "${inputUser || 'ini'}" BUKAN merupakan Pegawai / Staff Resmi Puskesmas Pondok Benda. Portal ini terenkripsi khusus untuk Petugas Loket, Dokter, dan Administrator Internal Puskesmas. Masyarakat/Pasien tidak diizinkan masuk ke portal internal ini.`
+      );
+      return;
     }
 
     if (found && (found.pass === inputPass || inputPass === '123456' || inputPass === 'password' || inputPass === 'petugas123' || inputPass === 'admin123' || inputPass === 'it123')) {
@@ -212,7 +261,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
       else if (found.user.role === 'admin') setActiveSubTab('ikm');
       else setActiveSubTab('loket');
     } else {
-      setLoginError('Email atau password kedinasan tidak valid. Silakan periksa kembali data login Anda.');
+      setLoginError('⚠️ Kata sandi kedinasan salah. Silakan periksa kembali password Anda.');
     }
   };
 
@@ -403,17 +452,44 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
             </div>
           </div>
 
+          {/* Security & Non-Registration Notice */}
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 space-y-1">
+            <div className="font-bold flex items-center gap-1.5 text-amber-900">
+              <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+              <span>Akses Terbatas Khusus Internal</span>
+            </div>
+            <p className="text-[11px] leading-relaxed text-amber-800">
+              Masyarakat / Pasien <strong>TIDAK DAPAT MENDATAR</strong> sebagai akun staff/admin. Pendaftaran akun staff baru hanya diproses oleh Administrator IT Dinkes.
+            </p>
+          </div>
+
           {loginError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2.5 text-xs text-rose-800 font-medium">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <span>{loginError}</span>
+            <div className="p-4 bg-rose-50 border border-rose-300 rounded-xl space-y-3">
+              <div className="flex items-start gap-2.5 text-xs text-rose-900 font-medium">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-bold text-rose-900 text-xs">Pemberitahuan Sistem Otentikasi</div>
+                  <p className="text-[11px] text-rose-800 leading-relaxed">{loginError}</p>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-rose-200 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('pendaftaran')}
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold rounded-lg transition shadow-2xs flex items-center gap-1"
+                >
+                  <span>Menu Pendaftaran Online Pasien</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           )}
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Email / Username Staff
+                Email / Username Staff Resmi
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -421,7 +497,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
                   type="text"
                   value={inputUser}
                   onChange={(e) => setInputUser(e.target.value)}
-                  placeholder="Masukkan Email / Username"
+                  placeholder="Masukkan email"
                   className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   required
                 />
@@ -430,7 +506,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
 
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Password
+                Masukkan Password
               </label>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -438,7 +514,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
                   type={showPass ? 'text' : 'password'}
                   value={inputPass}
                   onChange={(e) => setInputPass(e.target.value)}
-                  placeholder="Masukkan password..."
+                  placeholder="Masukkan password"
                   className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   required
                 />
@@ -457,7 +533,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
               className="w-full py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-lg transition shadow-xs flex items-center justify-center gap-2"
             >
               <ShieldAlert className="w-4 h-4 text-amber-300" />
-              <span>Masuk ke System Dashboard</span>
+              <span>Masuk Portal Internal</span>
             </button>
           </form>
 
@@ -498,13 +574,21 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-3 relative z-10">
+        <div className="flex items-center gap-2 sm:gap-3 relative z-10 flex-wrap">
           <button
-            onClick={() => handleExportFilteredCSV('Keseluruhan', tickets)}
+            onClick={() => setIsExportExcelOpen(true)}
             className="flex items-center gap-2 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-lg transition shadow-xs"
           >
             <FileSpreadsheet className="w-4 h-4" />
-            <span>Ekspor CSV</span>
+            <span>Ekspor Excel (.xlsx)</span>
+          </button>
+
+          <button
+            onClick={() => handleExportFilteredCSV('Keseluruhan', tickets)}
+            className="flex items-center gap-2 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-lg border border-slate-700 transition"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>CSV</span>
           </button>
 
           <button
@@ -536,7 +620,46 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
           }`}
         >
           <Volume2 className="w-4 h-4 text-emerald-400" />
-          <span>Loket & Pemanggilan Antrean</span>
+          <span>Manajemen Antrean Loket Saja</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('pelayanan-medis')}
+          className={`px-4 py-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-2 ${
+            activeSubTab === 'pelayanan-medis'
+              ? 'bg-emerald-700 text-white shadow-xs'
+              : 'text-slate-700 hover:bg-slate-100 font-extrabold'
+          }`}
+        >
+          <Stethoscope className="w-4 h-4 text-emerald-300" />
+          <span>Pemeriksaan Dokter (Pelayanan & Medis)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('farmasi')}
+          className={`px-4 py-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-2 ${
+            activeSubTab === 'farmasi'
+              ? 'bg-teal-700 text-white shadow-xs'
+              : 'text-slate-700 hover:bg-slate-100 font-extrabold'
+          }`}
+        >
+          <Pill className="w-4 h-4 text-teal-400" />
+          <span>Farmasi & Apoteker (e-Resep)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('sheet')}
+          className={`px-4 py-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-2 ${
+            activeSubTab === 'sheet'
+              ? 'bg-yellow-500 text-slate-900 shadow-xs ring-2 ring-yellow-400'
+              : 'text-slate-700 hover:bg-yellow-50 font-extrabold'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4 text-emerald-800" />
+          <span>Live Sheet Rekap ({tickets.length})</span>
+          <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-900 text-[10px] rounded-full font-black">
+            Excel
+          </span>
         </button>
 
         <button
@@ -548,7 +671,19 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
           }`}
         >
           <Users className="w-4 h-4 text-emerald-400" />
-          <span>Manajemen Data Pasien & Tiket ({tickets.length})</span>
+          <span>Data Pasien & Tiket</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('rme')}
+          className={`px-4 py-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-2 ${
+            activeSubTab === 'rme'
+              ? 'bg-emerald-700 text-white shadow-xs'
+              : 'text-slate-700 hover:bg-slate-100 font-extrabold'
+          }`}
+        >
+          <ClipboardList className="w-4 h-4 text-emerald-300" />
+          <span>Rekam Medis (RME)</span>
         </button>
 
         <button
@@ -560,7 +695,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
           }`}
         >
           <BrainCircuit className="w-4 h-4 text-emerald-400" />
-          <span>Uji Confusion Matrix (Slot Tersedia)</span>
+          <span>Uji Confusion Matrix</span>
         </button>
 
         {(currentUser.role === 'admin' || currentUser.role === 'it') && (
@@ -770,27 +905,49 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
                             className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               t.status === 'Called'
                                 ? 'bg-amber-400 text-slate-950'
+                                : t.status === 'Verified'
+                                ? 'bg-teal-100 text-teal-800 border border-teal-300 font-extrabold'
                                 : t.status === 'Waiting'
                                 ? 'bg-emerald-100 text-emerald-800'
                                 : 'bg-slate-100 text-slate-500'
                             }`}
                           >
-                            {t.status}
+                            {t.status === 'Verified' ? 'Terverifikasi' : t.status}
                           </span>
                         </td>
                         <td className="p-3 text-right space-x-1">
                           {t.status === 'Waiting' && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  onUpdateStatus(t.id, 'Verified');
+                                  addAuditLog('VERIFIKASI', `Pendaftaran pasien ${t.fullName} (${t.queueNumber}) telah DIVERIFIKASI oleh petugas ${currentUser.name}.`);
+                                }}
+                                className="px-2 py-1 bg-teal-700 text-white rounded font-bold text-[11px] hover:bg-teal-800 shadow-2xs"
+                                title="Verifikasi pendaftaran dan identitas pasien"
+                              >
+                                Verifikasi
+                              </button>
+                              <button
+                                onClick={() => onUpdateStatus(t.id, 'Called')}
+                                className="px-2 py-1 bg-emerald-700 text-white rounded font-bold text-[11px] hover:bg-emerald-800"
+                              >
+                                Panggil
+                              </button>
+                            </>
+                          )}
+                          {t.status === 'Verified' && (
                             <button
                               onClick={() => onUpdateStatus(t.id, 'Called')}
-                              className="px-2.5 py-1 bg-emerald-700 text-white rounded font-bold text-[11px] hover:bg-emerald-800"
+                              className="px-2 py-1 bg-emerald-700 text-white rounded font-bold text-[11px] hover:bg-emerald-800"
                             >
-                              Panggil
+                              Panggil Pasien
                             </button>
                           )}
                           {t.status === 'Called' && (
                             <button
                               onClick={() => onUpdateStatus(t.id, 'Completed')}
-                              className="px-2.5 py-1 bg-blue-600 text-white rounded font-bold text-[11px] hover:bg-blue-700"
+                              className="px-2 py-1 bg-blue-600 text-white rounded font-bold text-[11px] hover:bg-blue-700"
                             >
                               Selesai
                             </button>
@@ -806,6 +963,15 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
           </div>
 
         </div>
+      )}
+
+      {/* SUBTAB: LIVE GOOGLE SHEETS REKAP PASIEN */}
+      {activeSubTab === 'sheet' && (
+        <SpreadsheetPasienRekap
+          tickets={tickets}
+          onRefresh={onRefresh}
+          onUpdateStatus={onUpdateStatus}
+        />
       )}
 
       {/* SUBTAB 2: MANAJEMEN DATA PASIEN & TIKET */}
@@ -897,6 +1063,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
               >
                 <option value="all">Semua Status</option>
                 <option value="Waiting">Menunggu (Waiting)</option>
+                <option value="Verified">Terverifikasi (Verified)</option>
                 <option value="Called">Dipanggil (Called)</option>
                 <option value="Completed">Selesai (Completed)</option>
                 <option value="Cancelled">Dibatalkan (Cancelled)</option>
@@ -936,6 +1103,8 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
                         className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           t.status === 'Called'
                             ? 'bg-amber-400 text-slate-950'
+                            : t.status === 'Verified'
+                            ? 'bg-teal-100 text-teal-800 border border-teal-300 font-extrabold'
                             : t.status === 'Waiting'
                             ? 'bg-emerald-100 text-emerald-800'
                             : t.status === 'Completed'
@@ -943,7 +1112,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
                             : 'bg-rose-100 text-rose-800'
                         }`}
                       >
-                        {t.status}
+                        {t.status === 'Verified' ? 'Terverifikasi' : t.status}
                       </span>
                     </td>
                     <td className="p-3 text-right">
@@ -953,6 +1122,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
                         className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-[11px] font-bold text-slate-800"
                       >
                         <option value="Waiting">Waiting</option>
+                        <option value="Verified">Verified (Terverifikasi)</option>
                         <option value="Called">Called</option>
                         <option value="Completed">Completed</option>
                         <option value="Cancelled">Cancelled</option>
@@ -1179,10 +1349,38 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
         </div>
       )}
 
+      {/* SUBTAB: PELAYANAN & MEDIS (DOKTER) */}
+      {activeSubTab === 'pelayanan-medis' && (
+        <PelayananMedisView
+          polis={polis}
+          tickets={tickets}
+          onUpdateTicketStatus={onUpdateStatus}
+          onRefresh={onRefresh}
+        />
+      )}
+
+      {/* SUBTAB: INSTALASI FARMASI & APOTEKER (e-RESEP) */}
+      {activeSubTab === 'farmasi' && (
+        <ApotekerFarmasiView />
+      )}
+
+      {/* SUBTAB: REKAM MEDIS ELEKTRONIK (RME) */}
+      {activeSubTab === 'rme' && (
+        <RmeManagementPanel polis={polis} />
+      )}
+
       {/* SUBTAB 6: CONFUSION MATRIX EVALUATION */}
       {activeSubTab === 'confusion-matrix' && (
         <ConfusionMatrixPage onBack={() => setActiveSubTab('loket')} />
       )}
+
+      {/* MODAL: EXPORT EXCEL LAPORAN */}
+      <ExportExcelModal
+        isOpen={isExportExcelOpen}
+        onClose={() => setIsExportExcelOpen(false)}
+        tickets={tickets}
+        polis={polis}
+      />
 
     </div>
   );

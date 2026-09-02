@@ -24,11 +24,61 @@ export default function App() {
   const [beritaCategory, setBeritaCategory] = useState<string>('Semua');
   const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
 
-  const [polis, setPolis] = useState<PoliService[]>(INITIAL_POLIS);
+  const [polis, setPolis] = useState<PoliService[]>(() => {
+    try {
+      const saved = localStorage.getItem('puskesmas_polis_data');
+      return saved ? JSON.parse(saved) : INITIAL_POLIS;
+    } catch {
+      return INITIAL_POLIS;
+    }
+  });
   const [tickets, setTickets] = useState<QueueTicket[]>(INITIAL_TICKETS);
-  const [doctors, setDoctors] = useState<DoctorSchedule[]>(INITIAL_DOCTORS);
-  const [articles, setArticles] = useState<HealthArticle[]>(INITIAL_ARTICLES);
-  const [announcements, setAnnouncements] = useState<Announcement[]>(INITIAL_ANNOUNCEMENTS);
+  const [doctors, setDoctors] = useState<DoctorSchedule[]>(() => {
+    try {
+      const saved = localStorage.getItem('puskesmas_doctors_data');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.map((d: DoctorSchedule) => ({ ...d, photoUrl: '' }));
+      }
+      return INITIAL_DOCTORS;
+    } catch {
+      return INITIAL_DOCTORS;
+    }
+  });
+  const [articles, setArticles] = useState<HealthArticle[]>(() => {
+    try {
+      const saved = localStorage.getItem('puskesmas_articles_data');
+      return saved ? JSON.parse(saved) : INITIAL_ARTICLES;
+    } catch {
+      return INITIAL_ARTICLES;
+    }
+  });
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => {
+    try {
+      const saved = localStorage.getItem('puskesmas_announcements_data');
+      return saved ? JSON.parse(saved) : INITIAL_ANNOUNCEMENTS;
+    } catch {
+      return INITIAL_ANNOUNCEMENTS;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('puskesmas_doctors_data', JSON.stringify(doctors));
+    } catch {}
+  }, [doctors]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('puskesmas_polis_data', JSON.stringify(polis));
+    } catch {}
+  }, [polis]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('puskesmas_articles_data', JSON.stringify(articles));
+    } catch {}
+  }, [articles]);
 
   const [activeTicketModal, setActiveTicketModal] = useState<QueueTicket | null>(null);
   const [searchFilterQuery, setSearchFilterQuery] = useState<string>('');
@@ -84,6 +134,9 @@ export default function App() {
   const handleTicketCreated = (newTicket: QueueTicket) => {
     setTickets((prev) => [newTicket, ...prev]);
     setSearchFilterQuery(newTicket.queueNumber);
+    try {
+      localStorage.setItem('puskesmas_my_tracked_ticket_num', newTicket.queueNumber);
+    } catch (e) {}
     setActiveTicketModal(newTicket);
     setActiveTab('antrean');
   };
@@ -155,6 +208,7 @@ export default function App() {
                 tickets={tickets}
                 onRefresh={fetchBackendData}
                 searchFilterQuery={searchFilterQuery}
+                onOpenTicketModal={(t) => setActiveTicketModal(t)}
               />
 
               <LayananPoli
@@ -193,6 +247,7 @@ export default function App() {
             tickets={tickets}
             onRefresh={fetchBackendData}
             searchFilterQuery={searchFilterQuery}
+            onOpenTicketModal={(t) => setActiveTicketModal(t)}
           />
         )}
 

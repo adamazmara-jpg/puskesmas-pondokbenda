@@ -7,6 +7,66 @@ export interface PatientRecord {
   gender?: 'L' | 'P';
   lastPoli?: string;
   phone?: string;
+  familyHead?: string;
+  medicalRecordNo?: string;
+  oldMedicalRecordNo?: string;
+  documentRmNo?: string;
+}
+
+// Calculate exact detailed age in "X Thn Y Bln Z Hr"
+export function calculateDetailedAge(birthDateStr: string): string {
+  if (!birthDateStr) return '0 Thn 0 Bln 0 Hr';
+  
+  let birthDate: Date;
+  if (birthDateStr.includes('/')) {
+    const parts = birthDateStr.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      birthDate = new Date(year, month, day);
+    } else {
+      birthDate = new Date(birthDateStr);
+    }
+  } else if (birthDateStr.includes('-')) {
+    const parts = birthDateStr.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        // YYYY-MM-DD
+        birthDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      } else {
+        // DD-MM-YYYY
+        birthDate = new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10));
+      }
+    } else {
+      birthDate = new Date(birthDateStr);
+    }
+  } else {
+    birthDate = new Date(birthDateStr);
+  }
+
+  if (isNaN(birthDate.getTime())) return '0 Thn 0 Bln 0 Hr';
+
+  const today = new Date();
+  let years = today.getFullYear() - birthDate.getFullYear();
+  let months = today.getMonth() - birthDate.getMonth();
+  let days = today.getDate() - birthDate.getDate();
+
+  if (days < 0) {
+    months -= 1;
+    // Get days in previous month
+    const prevMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    days += prevMonth.getDate();
+  }
+
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  if (years < 0) return '0 Thn 0 Bln 0 Hr';
+
+  return `${years} Thn ${months} Bln ${days} Hr`;
 }
 
 // Calculate age from birthDate string (handles both YYYY-MM-DD and DD/MM/YYYY)
@@ -52,11 +112,32 @@ export function formatBirthDateToInput(birthDateStr: string): string {
       return `${year}-${month}-${day}`;
     }
   }
+  if (birthDateStr.includes('-')) {
+    const parts = birthDateStr.split('-');
+    if (parts.length === 3 && parts[0].length === 2 && parts[2].length === 4) {
+      // DD-MM-YYYY to YYYY-MM-DD
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
   return birthDateStr;
 }
 
-// Extracted Patient Dataset from Puskesmas Pondok Benda File / PDF Records
+// Extracted Patient Dataset from Puskesmas Records
 export const PATIENT_DATABASE: PatientRecord[] = [
+  {
+    nik: '3671042306040003',
+    bpjsNumber: '0001892837461',
+    fullName: 'ADAM AZMARA AZRA PUTRA',
+    birthDate: '2004-06-23',
+    address: 'JL.AL MUKHLISIN RT 02 RW 06 Kel JURUMUDI Kec BENDA, KOTA TANGERANG',
+    gender: 'L',
+    lastPoli: 'Klaster 3 (Umum Dewasa)',
+    phone: '082258643854',
+    familyHead: 'JURIANTO',
+    medicalRecordNo: '03304104',
+    oldMedicalRecordNo: 'P367106014101319',
+    documentRmNo: 'P08-10-2017'
+  },
   {
     nik: '3674065810690004',
     bpjsNumber: '1790635882',

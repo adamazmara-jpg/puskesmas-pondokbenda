@@ -23,20 +23,22 @@ import {
   HelpCircle,
   UserPlus,
   Zap,
-  XCircle,
-  RotateCcw
+  Printer,
+  HeartPulse,
+  Baby,
+  Users,
+  ShieldAlert,
+  Send
 } from 'lucide-react';
 import { PoliService, QueueTicket, PatientType, Gender } from '../types';
 import {
   searchPatientByNikOrBpjs,
   calculateAge,
+  calculateDetailedAge,
   formatBirthDateToInput,
   PatientRecord
 } from '../data/patientDatabase';
-import {
-  RandomForestWidget
-} from './RandomForestWidget';
-import { DOCTOR_MASTER_DATABASE } from '../utils/randomForestPredictor';
+import { INITIAL_DOCTORS } from '../data/mockData';
 
 interface PendaftaranOnlineProps {
   polis: PoliService[];
@@ -44,848 +46,1283 @@ interface PendaftaranOnlineProps {
   setActiveTab: (tab: string) => void;
 }
 
+// 4 Klaster ILP (Integrasi Pelayanan Primer) Data
+interface KlasterInfo {
+  number: number;
+  name: string;
+  badge: string;
+  badgeColor: string;
+  bgColor: string;
+  borderColor: string;
+  accentColor: string;
+  icon: any;
+  tagline: string;
+  description: string;
+  services: { id: string; name: string; desc: string; defaultPoliId: string }[];
+  defaultDoctor: string;
+}
+
+const KLASTER_LIST: KlasterInfo[] = [
+  {
+    number: 1,
+    name: 'Klaster 1: Manajemen & Tata Kelola',
+    badge: 'Administrasi & Rujukan',
+    badgeColor: 'bg-blue-100 text-blue-800 border-blue-300',
+    bgColor: 'from-blue-50/70 to-indigo-50/40',
+    borderColor: 'border-blue-300 hover:border-blue-500',
+    accentColor: 'text-blue-700',
+    icon: ShieldCheck,
+    tagline: 'Administrasi Umum, Surat Keterangan & Rujukan',
+    description: 'Melayani pengurusan surat keterangan sehat/bebas narkoba, konsultasi administrasi BPJS, surat rujukan, pengaduan masyarakat, serta layanan informasi terpadu.',
+    services: [
+      { id: 'srv-1-1', name: 'Surat Keterangan Sehat / Bebas Narkoba', desc: 'Pemeriksaan fisik umum untuk keperluan kerja/sekolah', defaultPoliId: 'poli-umum' },
+      { id: 'srv-1-2', name: 'Konsultasi Rujukan & Administrasi BPJS', desc: 'Pelayanan rujukan berjenjang FKTP ke Rumah Sakit', defaultPoliId: 'poli-umum' },
+      { id: 'srv-1-3', name: 'Layanan Informasi & Mutu Pelayanan', desc: 'Informasi alur dan pengaduan masyarakat', defaultPoliId: 'poli-umum' }
+    ],
+    defaultDoctor: 'dr. H. Bambang Suherman'
+  },
+  {
+    number: 2,
+    name: 'Klaster 2: Ibu, Anak, dan Remaja',
+    badge: 'KIA, KB & Imunisasi',
+    badgeColor: 'bg-pink-100 text-pink-800 border-pink-300',
+    bgColor: 'from-pink-50/70 to-rose-50/40',
+    borderColor: 'border-pink-300 hover:border-pink-500',
+    accentColor: 'text-pink-700',
+    icon: Baby,
+    tagline: 'Kesehatan Ibu Hamil, Bayi/Balita, KB & Remaja',
+    description: 'Melayani pemeriksaan ibu hamil (ANC/PNC), program KB, imunisasi rutin lengkap bayi dan balita, pemeriksaan balita sakit (MTBS), pemantauan stunting, serta kesehatan reproduksi remaja & calon pengantin.',
+    services: [
+      { id: 'srv-2-1', name: 'Poli KIA & Keluarga Berencana (KB)', desc: 'Pemeriksaan kehamilan, nifas, USG dasar, KB suntik/IUD', defaultPoliId: 'poli-kia-kb' },
+      { id: 'srv-2-2', name: 'Poli Anak & Imunisasi Lengkap', desc: 'Imunisasi dasar lengkap, MTBS, tumbuh kembang balita', defaultPoliId: 'poli-anak-imunisasi' },
+      { id: 'srv-2-3', name: 'Poli Remaja & Calon Pengantin (Catin)', desc: 'Skrining anemia remaja, konseling pranikah, kespro', defaultPoliId: 'poli-kia-kb' }
+    ],
+    defaultDoctor: 'Bidan Nining Kurnia, S.ST'
+  },
+  {
+    number: 3,
+    name: 'Klaster 3: Usia Dewasa dan Lanjut Usia',
+    badge: 'Umum Dewasa & Lansia',
+    badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+    bgColor: 'from-emerald-50/70 to-teal-50/40',
+    borderColor: 'border-emerald-300 hover:border-emerald-500',
+    accentColor: 'text-emerald-700',
+    icon: Users,
+    tagline: 'Pemeriksaan Umum Dewasa, Skrining PTM & Geriatri',
+    description: 'Melayani pengobatan umum usia dewasa, skrining Penyakit Tidak Menular (Hipertensi, Diabetes Melitus, Asam Urat, Kolesterol), pelayanan kesehatan Lansia/Geriatri, kesehatan jiwa, dan deteksi dini kanker.',
+    services: [
+      { id: 'srv-3-1', name: 'Poli Umum Dewasa (Klaster 3)', desc: 'Pemeriksaan umum penyakit akut/kronis usia 18-59 tahun', defaultPoliId: 'poli-umum' },
+      { id: 'srv-3-2', name: 'Poli Lansia & Pengendalian PTM', desc: 'Pelayanan geriatri (>60 tahun), kontrol rutin tensi & gula darah', defaultPoliId: 'poli-umum' },
+      { id: 'srv-3-3', name: 'Skrining Kesehatan & Konseling Jiwa', desc: 'Deteksi dini faktor risiko penyakit tidak menular & kesehatan mental', defaultPoliId: 'poli-umum' }
+    ],
+    defaultDoctor: 'dr. Ananto Adi Swasono'
+  },
+  {
+    number: 4,
+    name: 'Klaster 4: Penanggulangan Penyakit Menular',
+    badge: 'P2P & Lintas Klaster',
+    badgeColor: 'bg-amber-100 text-amber-800 border-amber-300',
+    bgColor: 'from-amber-50/70 to-orange-50/40',
+    borderColor: 'border-amber-300 hover:border-amber-500',
+    accentColor: 'text-amber-700',
+    icon: ShieldAlert,
+    tagline: 'TB Paru/ISPA, Gigi & Mulut, Lab & Farmasi',
+    description: 'Melayani penanganan TB Paru (TCM), batuk kronis, ISPA, HIV/IMS, Kusta, DBD, infeksi menular lainnya, serta unit lintas klaster seperti Poli Gigi & Mulut, Laboratorium, Farmasi Obat, dan Tindakan Darurat.',
+    services: [
+      { id: 'srv-4-1', name: 'Poli Batuk & TB Paru / ISPA', desc: 'Skrining dahak TCM, rontgen TB, terapi OAT, ISPA', defaultPoliId: 'poli-tb-ispa' },
+      { id: 'srv-4-2', name: 'Poli Gigi & Mulut', desc: 'Pembersihan karang gigi, penambalan, pencabutan, perawatan gusi', defaultPoliId: 'poli-gigi' },
+      { id: 'srv-4-3', name: 'Laboratorium Medis & Farmasi Obat', desc: 'Pemeriksaan darah, urine, sputum, dan pengambilan resep obat', defaultPoliId: 'poli-umum' }
+    ],
+    defaultDoctor: 'drg. Maya Rosdiana'
+  }
+];
+
+const TIME_SLOTS = [
+  { id: 'slot-1', time: '08:00:00 - 11:30:00', label: 'Sesi Pagi (08:00 - 11:30 WIB)', quota: 'Sisa Kuota: 24 Pasien', available: true },
+  { id: 'slot-2', time: '11:30:00 - 13:00:00', label: 'Sesi Siang Awal (11:30 - 13:00 WIB)', quota: 'Sisa Kuota: 18 Pasien', available: true },
+  { id: 'slot-3', time: '13:00:00 - 14:30:00', label: 'Sesi Siang Akhir (13:00 - 14:30 WIB)', quota: 'Sisa Kuota: 12 Pasien', available: true }
+];
+
+const QUICK_COMPLAINTS = [
+  'Demam, flu, dan batuk berdahak sudah 3 hari',
+  'Pusing berputar, sakit kepala, dan badan lemas',
+  'Kontrol tensi darah tinggi & pemeriksaan rutin',
+  'Nyeri ulu hati, mual, dan asam lambung naik',
+  'Sakit gigi berdenyut dan gusi bengkak',
+  'Pemeriksaan kehamilan rutin (ANC) trimester 2',
+  'Imunisasi dasar lengkap balita (DPT/Polio)',
+  'Batuk lama lebih dari 2 minggu & sesak napas ringan'
+];
+
 export const PendaftaranOnline: React.FC<PendaftaranOnlineProps> = ({
   polis,
   onTicketCreated,
   setActiveTab,
 }) => {
-  // Step State (1: Pencarian NIK, 2: Verifikasi Data Pasien, 3: Pilih Poli & ML Random Forest)
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  // 5 Guided Steps:
+  // Step 1: Input NIK / No BPJS & Data Pasien
+  // Step 2: Pilih Klaster (1, 2, 3, 4) & Layanan
+  // Step 3: Pilih Dokter & Jam Kunjungan
+  // Step 4: Masukkan Keluhan Pasien
+  // Step 5: Konfirmasi & Cetak Tiket Kunjungan
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
-  // Search Input State
+  // Search & Identification
   const [searchQuery, setSearchQuery] = useState('');
   const [searchSource, setSearchSource] = useState<'NIK' | 'BPJS'>('NIK');
   const [searchHasRun, setSearchHasRun] = useState(false);
   const [foundPatient, setFoundPatient] = useState<PatientRecord | null>(null);
 
-  // Form Field State
+  // Patient Identity Form (Default empty before NIK / BPJS is entered)
   const [patientType, setPatientType] = useState<PatientType>('BPJS');
   const [nik, setNik] = useState('');
   const [bpjsNumber, setBpjsNumber] = useState('');
   const [fullName, setFullName] = useState('');
-  const [birthDate, setBirthDate] = useState('1992-06-15');
+  const [birthDate, setBirthDate] = useState('');
+  const [familyHead, setFamilyHead] = useState('');
   const [gender, setGender] = useState<Gender>('L');
   const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('Pondok Benda, Pamulang, Tangerang Selatan');
-  const [poliId, setPoliId] = useState(polis[0]?.id || 'poli-umum');
-  const [appointmentDate, setAppointmentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [timeSlot, setTimeSlot] = useState('08:00 - 10:00 WIB');
-  const [chiefComplaint, setChiefComplaint] = useState('');
+  const [address, setAddress] = useState('');
+  const [medicalRecordNo, setMedicalRecordNo] = useState('');
+  const [oldMedicalRecordNo, setOldMedicalRecordNo] = useState('');
+  const [documentRmNo, setDocumentRmNo] = useState('');
 
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  // Klaster & Service Selection
+  const [selectedKlasterNumber, setSelectedKlasterNumber] = useState<number>(3); // Default Klaster 3
+  const [selectedServiceId, setSelectedServiceId] = useState<string>('srv-3-1');
+  const [selectedPoliId, setSelectedPoliId] = useState<string>('poli-umum');
+  const [selectedPoliName, setSelectedPoliName] = useState<string>('UMUM DEWASA');
 
-  const handleResetForm = () => {
-    setCurrentStep(1);
-    setSearchQuery('');
-    setSearchHasRun(false);
-    setFoundPatient(null);
-    setPatientType('BPJS');
-    setNik('');
-    setBpjsNumber('');
-    setFullName('');
-    setBirthDate('1992-06-15');
-    setGender('L');
-    setPhone('');
-    setAddress('Pondok Benda, Pamulang, Tangerang Selatan');
-    setPoliId(polis[0]?.id || 'poli-umum');
-    setAppointmentDate(new Date().toISOString().split('T')[0]);
-    setTimeSlot('08:00 - 10:00 WIB');
-    setChiefComplaint('');
-    setErrorMsg('');
-  };
+  // Doctor & Time Slot Selection
+  const [selectedDoctorName, setSelectedDoctorName] = useState<string>('dr. Ananto Adi Swasono');
+  const [appointmentDate, setAppointmentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('08:00:00 - 11:30:00');
 
-  // 1. TAHAP 1: PENCARIAN DIREK PASIEN BERDASARKAN NIK / BPJS
+  // Complaint
+  const [chiefComplaint, setChiefComplaint] = useState<string>('');
+
+  // Processing & Error
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // Handle Search by NIK or BPJS
   const handleSearchPatient = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    setErrorMsg('');
+    if (!searchQuery.trim()) {
+      setErrorMessage('Silakan masukkan NIK (16 digit) atau Nomor BPJS');
+      return;
+    }
+
+    setErrorMessage('');
+    const patient = searchPatientByNikOrBpjs(searchQuery.trim());
     setSearchHasRun(true);
 
-    const cleanQuery = searchQuery.trim().replace(/\D/g, '');
-    if (!cleanQuery || cleanQuery.length < 5) {
-      setErrorMsg('Ketik minimal 5 digit NIK KTP atau Nomor BPJS untuk melakukan pencarian');
-      return;
-    }
-
-    const matched = searchPatientByNikOrBpjs(cleanQuery);
-    if (matched) {
-      setFoundPatient(matched);
-      setNik(matched.nik);
-      if (matched.bpjsNumber) {
-        setBpjsNumber(matched.bpjsNumber);
-        setPatientType('BPJS');
-      } else {
-        setBpjsNumber('');
-        setPatientType('Umum');
-      }
-      setFullName(matched.fullName);
-      if (matched.birthDate) setBirthDate(formatBirthDateToInput(matched.birthDate));
-      if (matched.address) setAddress(matched.address);
-      if (matched.gender) setGender(matched.gender);
-      if (matched.phone) setPhone(matched.phone);
+    if (patient) {
+      setFoundPatient(patient);
+      setNik(patient.nik);
+      setBpjsNumber(patient.bpjsNumber || '');
+      setFullName(patient.fullName);
+      setBirthDate(formatBirthDateToInput(patient.birthDate));
+      setFamilyHead(patient.familyHead || '');
+      setGender(patient.gender || 'L');
+      setPhone(patient.phone || '');
+      setAddress(patient.address);
+      setMedicalRecordNo(patient.medicalRecordNo || `03${patient.nik.slice(-6)}`);
+      setOldMedicalRecordNo(patient.oldMedicalRecordNo || `P${patient.nik.slice(0, 8)}101319`);
+      setDocumentRmNo(patient.documentRmNo || `P08-10-${new Date().getFullYear()}`);
     } else {
       setFoundPatient(null);
-      if (cleanQuery.length === 16) {
-        setNik(cleanQuery);
+      if (searchSource === 'NIK') {
+        setNik(searchQuery.trim());
+        setBpjsNumber('');
+      } else {
+        setBpjsNumber(searchQuery.trim());
+        setNik('');
       }
+      setFullName('');
+      setBirthDate('');
+      setFamilyHead('');
+      setPhone('');
+      setAddress('');
+      setMedicalRecordNo('');
+      setOldMedicalRecordNo('');
+      setDocumentRmNo('');
     }
   };
 
-  // Navigasi Tahap 1 -> Tahap 2
-  const handleProceedToStep2 = () => {
-    setErrorMsg('');
-    if (!searchHasRun && !nik) {
-      setErrorMsg('Silakan masukkan NIK KTP atau Nomor BPJS dan tekan tombol Cari Data terlebih dahulu.');
-      return;
-    }
-    setCurrentStep(2);
+  // Select Klaster
+  const handleSelectKlaster = (klaster: KlasterInfo) => {
+    setSelectedKlasterNumber(klaster.number);
+    const firstService = klaster.services[0];
+    setSelectedServiceId(firstService.id);
+    setSelectedPoliId(firstService.defaultPoliId);
+    
+    if (klaster.number === 1) setSelectedPoliName('MANAJEMEN & TATA KELOLA');
+    else if (klaster.number === 2) setSelectedPoliName('IBU, ANAK & REMAJA');
+    else if (klaster.number === 3) setSelectedPoliName('UMUM DEWASA');
+    else if (klaster.number === 4) setSelectedPoliName('PENYAKIT MENULAR & GIGI');
+
+    setSelectedDoctorName(klaster.defaultDoctor);
   };
 
-  // Navigasi Tahap 2 -> Tahap 3
-  const handleProceedToStep3 = () => {
-    setErrorMsg('');
-    if (!fullName.trim()) {
-      setErrorMsg('Nama Lengkap Pasien wajib diisi');
-      return;
-    }
-    if (!nik || nik.length < 16) {
-      setErrorMsg('Nomor NIK KTP harus 16 digit angka');
-      return;
-    }
-    if (patientType === 'BPJS' && !bpjsNumber) {
-      setErrorMsg('Nomor BPJS Kesehatan wajib diisi untuk pasien BPJS');
-      return;
-    }
-    if (!phone) {
-      setErrorMsg('Nomor HP / WhatsApp wajib diisi');
-      return;
-    }
-    setCurrentStep(3);
+  // Select Service within Klaster
+  const handleSelectService = (srv: { id: string; name: string; defaultPoliId: string }) => {
+    setSelectedServiceId(srv.id);
+    setSelectedPoliId(srv.defaultPoliId);
+    setSelectedPoliName(srv.name.toUpperCase());
   };
 
-  // Submit Final Form
-  const handleSubmitFinal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
+  // Doctors available for current klaster
+  const filteredDoctors = INITIAL_DOCTORS.filter(doc => {
+    if (selectedKlasterNumber === 3) return doc.doctorName.includes('Ananto') || doc.doctorName.includes('Bambang') || doc.doctorName.includes('Fauzi');
+    if (selectedKlasterNumber === 2) return doc.doctorName.includes('Nining') || doc.doctorName.includes('Siska');
+    if (selectedKlasterNumber === 4) return doc.doctorName.includes('Maya') || doc.doctorName.includes('Rian');
+    return true;
+  });
 
-    // Check date range limit (max 1 month)
-    const todayStr = new Date().toISOString().split('T')[0];
-    const maxDate = new Date();
-    maxDate.setMonth(maxDate.getMonth() + 1);
-    const maxDateStr = maxDate.toISOString().split('T')[0];
+  // Calculate detailed age
+  const calculatedDetailedAgeStr = birthDate ? calculateDetailedAge(birthDate) : '-';
 
-    if (appointmentDate < todayStr || appointmentDate > maxDateStr) {
-      setErrorMsg('Tanggal pendaftaran hanya diperbolehkan dari hari ini sampai maksimal 1 bulan ke depan.');
+  // Generate Queue Number prefix
+  const getQueuePrefix = () => {
+    if (selectedKlasterNumber === 3) return 'AC';
+    if (selectedKlasterNumber === 2) return 'B';
+    if (selectedKlasterNumber === 1) return 'A';
+    return 'C';
+  };
+
+  // Submit and create ticket
+  const handleSubmitRegistration = async () => {
+    if (!nik || !fullName || !phone) {
+      setErrorMessage('Mohon lengkapi NIK, Nama Lengkap, dan Nomor HP Pasien.');
+      setCurrentStep(1);
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
+    setErrorMessage('');
+
+    const randomSeq = Math.floor(Math.random() * 80) + 10;
+    const generatedQueueNumber = `${getQueuePrefix()}-${String(randomSeq).padStart(4, '0')}`;
+    const generatedRegNumber = String(Math.floor(Math.random() * 900) + 50).padStart(4, '0');
+    const feeText = patientType === 'BPJS' ? 'Rp. 0 (BPJS Kesehatan)' : 'Rp. 10,000';
+
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = now.getFullYear();
+    const formattedDate = `${day}/${month}/${year}`;
+    const formattedDateTime = `${day}/${month}/${year} ${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+    const payload = {
+      patientType,
+      nik,
+      bpjsNumber,
+      fullName: fullName.toUpperCase(),
+      birthDate,
+      gender,
+      phone,
+      address,
+      poliId: selectedPoliId,
+      appointmentDate,
+      timeSlot: selectedTimeSlot,
+      chiefComplaint: chiefComplaint || 'Pemeriksaan Kesehatan',
+      klasterNumber: selectedKlasterNumber,
+      klasterName: selectedKlasterNumber === 3 ? 'KLASTER 3' : `KLASTER ${selectedKlasterNumber}`,
+      doctorName: selectedDoctorName,
+      queueNumber: generatedQueueNumber,
+      registrationNumber: generatedRegNumber,
+      familyHead: familyHead ? familyHead.toUpperCase() : '',
+      medicalRecordNo: medicalRecordNo || (nik ? `03${nik.slice(-6)}` : `03${Math.floor(100000 + Math.random() * 900000)}`),
+      oldMedicalRecordNo: oldMedicalRecordNo || '',
+      documentRmNo: documentRmNo || '',
+      ageFormatted: calculatedDetailedAgeStr !== '-' ? calculatedDetailedAgeStr : '',
+      fee: feeText,
+      timestamp: formattedDate,
+      timestampLoket: formattedDateTime,
+      hadir: true
+    };
 
     try {
       const res = await fetch('/api/pendaftaran', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (data.success && data.data) {
+        onTicketCreated(data.data);
+      } else {
+        // Fallback local ticket if server returns error
+        const localTicket: QueueTicket = {
+          id: `tkt-${Date.now()}`,
+          queueNumber: generatedQueueNumber,
           patientType,
           nik,
           bpjsNumber,
-          fullName,
+          fullName: fullName.toUpperCase(),
           birthDate,
           gender,
           phone,
           address,
-          poliId,
+          poliId: selectedPoliId,
+          poliName: selectedPoliName,
+          klasterNumber: selectedKlasterNumber,
+          klasterName: `KLASTER ${selectedKlasterNumber}`,
+          doctorName: selectedDoctorName,
+          registrationNumber: generatedRegNumber,
+          familyHead: familyHead ? familyHead.toUpperCase() : '',
+          medicalRecordNo: medicalRecordNo || (nik ? `03${nik.slice(-6)}` : `03${Math.floor(100000 + Math.random() * 900000)}`),
+          oldMedicalRecordNo: oldMedicalRecordNo || '',
+          documentRmNo: documentRmNo || '',
+          ageFormatted: calculatedDetailedAgeStr !== '-' ? calculatedDetailedAgeStr : '',
+          fee: feeText,
           appointmentDate,
-          timeSlot,
-          chiefComplaint,
-        }),
-      });
-
-      const data = await res.json();
-      setLoading(false);
-
-      if (data.success && data.data) {
-        onTicketCreated(data.data);
-      } else {
-        setErrorMsg(data.message || 'Gagal menerbitkan tiket pendaftaran.');
+          timeSlot: selectedTimeSlot,
+          chiefComplaint: chiefComplaint || 'Pemeriksaan Kesehatan',
+          status: 'Waiting',
+          createdAt: now.toISOString(),
+          estimatedTime: '~ 15 menit setelah loket dibuka',
+          timestamp: formattedDate,
+          timestampLoket: formattedDateTime,
+          hadir: true,
+          timestampBPU: '',
+          timestampApotek: '',
+          statusBPU: 'Menunggu',
+          timestampLab: ''
+        };
+        onTicketCreated(localTicket);
       }
-    } catch (err) {
-      setLoading(false);
-      setErrorMsg('Terjadi kesalahan jaringan. Silakan periksa koneksi internet Anda.');
+    } catch (err: any) {
+      // Offline fallback
+      const localTicket: QueueTicket = {
+        id: `tkt-${Date.now()}`,
+        queueNumber: generatedQueueNumber,
+        patientType,
+        nik,
+        bpjsNumber,
+        fullName: fullName.toUpperCase(),
+        birthDate,
+        gender,
+        phone,
+        address,
+        poliId: selectedPoliId,
+        poliName: selectedPoliName,
+        klasterNumber: selectedKlasterNumber,
+        klasterName: `KLASTER ${selectedKlasterNumber}`,
+        doctorName: selectedDoctorName,
+        registrationNumber: generatedRegNumber,
+        familyHead: familyHead ? familyHead.toUpperCase() : '',
+        medicalRecordNo: medicalRecordNo || (nik ? `03${nik.slice(-6)}` : `03${Math.floor(100000 + Math.random() * 900000)}`),
+        oldMedicalRecordNo: oldMedicalRecordNo || '',
+        documentRmNo: documentRmNo || '',
+        ageFormatted: calculatedDetailedAgeStr !== '-' ? calculatedDetailedAgeStr : '',
+        fee: feeText,
+        appointmentDate,
+        timeSlot: selectedTimeSlot,
+        chiefComplaint: chiefComplaint || 'Pemeriksaan Kesehatan',
+        status: 'Waiting',
+        createdAt: now.toISOString(),
+        estimatedTime: '~ 15 menit setelah loket dibuka',
+        timestamp: formattedDate,
+        timestampLoket: formattedDateTime,
+        hadir: true,
+        timestampBPU: '',
+        timestampApotek: '',
+        statusBPU: 'Menunggu',
+        timestampLab: ''
+      };
+      onTicketCreated(localTicket);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const selectedPoli = polis.find((p) => p.id === poliId) || polis[0];
-  const patientAge = calculateAge(birthDate);
-  const assignedDoctor = DOCTOR_MASTER_DATABASE.find(d => d.poliId === poliId) || DOCTOR_MASTER_DATABASE[0];
+  const currentKlasterObj = KLASTER_LIST.find(k => k.number === selectedKlasterNumber) || KLASTER_LIST[2];
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+    <div className="max-w-5xl mx-auto space-y-6 animate-fadeIn pb-12">
       
-      {/* Header Title Section */}
-      <div className="text-center space-y-2">
-        <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 text-xs font-black px-3.5 py-1 rounded-full border border-emerald-200 shadow-sm">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Sistem Pendaftaran 3 Tahap & Evaluasi Random Forest ML</span>
-        </div>
-        <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-          Pendaftaran Berobat Pasien Mandiri
-        </h2>
-        <p className="text-slate-600 text-xs sm:text-sm max-w-2xl mx-auto">
-          Proses pendaftaran terintegrasi dalam 3 Tahap: Pencarian NIK KTP, Verifikasi Data Pasien, serta Pemilihan Poliklinik dengan Evaluasi Slot Tersedia & Waktu Tunggu Berbasis Random Forest.
-        </p>
-        <div className="flex justify-center pt-1">
-          <button
-            type="button"
-            onClick={handleResetForm}
-            className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 transition flex items-center gap-1.5 shadow-2xs"
-            title="Bersihkan formulir untuk mendaftarkan pasien/NIK berbeda"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-            <span>Form Pasien Baru / Daftar NIK Lain</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 3-STAGE NAVBAR (Navigation Bar Berbeda per Tahap) */}
-      <div className="bg-slate-900 text-white rounded-2xl p-3 sm:p-4 border border-slate-800 shadow-xl">
-        <div className="grid grid-cols-3 gap-2">
-          
-          {/* Stage Navbar 1 */}
-          <button
-            type="button"
-            onClick={() => setCurrentStep(1)}
-            className={`p-3 rounded-xl transition text-left flex items-center gap-3 relative overflow-hidden ${
-              currentStep === 1
-                ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/30'
-                : currentStep > 1
-                ? 'bg-slate-800 text-emerald-400 hover:bg-slate-750'
-                : 'bg-slate-950/60 text-slate-500 hover:bg-slate-800/50'
-            }`}
-          >
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shrink-0 ${
-              currentStep === 1
-                ? 'bg-white text-emerald-700'
-                : currentStep > 1
-                ? 'bg-emerald-500 text-slate-950'
-                : 'bg-slate-800 text-slate-400'
-            }`}>
-              {currentStep > 1 ? <Check className="w-5 h-5 stroke-[3]" /> : '1'}
-            </div>
-            <div className="hidden sm:block overflow-hidden">
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-200/80">
-                Tahap Pertama
-              </div>
-              <div className="text-xs font-bold truncate">Pencarian NIK / BPJS</div>
-            </div>
-          </button>
-
-          {/* Stage Navbar 2 */}
-          <button
-            type="button"
-            onClick={() => {
-              if (searchHasRun || nik) setCurrentStep(2);
-            }}
-            disabled={!searchHasRun && !nik}
-            className={`p-3 rounded-xl transition text-left flex items-center gap-3 relative overflow-hidden ${
-              currentStep === 2
-                ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/30'
-                : currentStep > 2
-                ? 'bg-slate-800 text-emerald-400 hover:bg-slate-750'
-                : 'bg-slate-950/60 text-slate-500 hover:bg-slate-800/50 disabled:opacity-50'
-            }`}
-          >
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shrink-0 ${
-              currentStep === 2
-                ? 'bg-white text-emerald-700'
-                : currentStep > 2
-                ? 'bg-emerald-500 text-slate-950'
-                : 'bg-slate-800 text-slate-400'
-            }`}>
-              {currentStep > 2 ? <Check className="w-5 h-5 stroke-[3]" /> : '2'}
-            </div>
-            <div className="hidden sm:block overflow-hidden">
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-200/80">
-                Tahap Kedua
-              </div>
-              <div className="text-xs font-bold truncate">Verifikasi Profil Pasien</div>
-            </div>
-          </button>
-
-          {/* Stage Navbar 3 */}
-          <button
-            type="button"
-            onClick={() => {
-              if (fullName) setCurrentStep(3);
-            }}
-            disabled={!fullName}
-            className={`p-3 rounded-xl transition text-left flex items-center gap-3 relative overflow-hidden ${
-              currentStep === 3
-                ? 'bg-emerald-600 text-white shadow-lg ring-2 ring-emerald-400/30'
-                : 'bg-slate-950/60 text-slate-500 hover:bg-slate-800/50 disabled:opacity-50'
-            }`}
-          >
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-sm shrink-0 ${
-              currentStep === 3
-                ? 'bg-white text-emerald-700'
-                : 'bg-slate-800 text-slate-400'
-            }`}>
-              3
-            </div>
-            <div className="hidden sm:block overflow-hidden">
-              <div className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-200/80">
-                Tahap Ketiga
-              </div>
-              <div className="text-xs font-bold truncate">Poliklinik & ML Prediction</div>
-            </div>
-          </button>
-
-        </div>
-      </div>
-
-      {/* Main Stage Content Container Card */}
-      <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
-        
-        {/* Error Alert Box */}
-        {errorMsg && (
-          <div className="p-4 bg-rose-50 border-b border-rose-200 text-rose-800 text-xs sm:text-sm font-bold flex items-center gap-3 animate-shake">
-            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-            <span>{errorMsg}</span>
+      {/* Top Header Card */}
+      <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-xl border border-emerald-800/60 relative overflow-hidden">
+        <div className="relative z-10 space-y-2">
+          <div className="inline-flex items-center gap-2 bg-emerald-700/60 text-emerald-200 text-xs font-bold px-3 py-1 rounded-full border border-emerald-500/40">
+            <ShieldCheck className="w-4 h-4 text-emerald-300" />
+            <span>Integrasi Layanan Primer (ILP) • Kemenkes RI</span>
           </div>
-        )}
+          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            Pendaftaran Antrean Online & Klaster Pelayanan
+          </h2>
+          <p className="text-slate-300 text-xs sm:text-sm max-w-2xl leading-relaxed">
+            Alur pendaftaran mandiri cepat: Masukkan NIK / No BPJS, pilih Klaster 1-4 sesuai kebutuhan, tentukan Dokter & Jam, isi Keluhan, lalu terbitkan e-Tiket Kunjungan untuk dicetak.
+          </p>
+        </div>
+      </div>
 
-        {/* ========================================================================= */}
-        {/* TAHAP 1: PENCARIAN DIREK NIK / BPJS */}
-        {/* ========================================================================= */}
-        {currentStep === 1 && (
-          <div className="p-6 sm:p-8 space-y-6 animate-fadeIn">
-            
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="space-y-1">
-                <span className="text-xs font-extrabold text-emerald-700 uppercase tracking-wider">
-                  Tahap 1 dari 3: Pencarian
-                </span>
-                <h3 className="text-xl font-black text-slate-900">Masukkan NIK KTP atau Nomor BPJS</h3>
+      {/* 5-Step Visual Progression Wizard Bar */}
+      <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200">
+        <div className="grid grid-cols-5 gap-1 sm:gap-2 text-center text-xs">
+          
+          {/* Step 1 */}
+          <button
+            onClick={() => setCurrentStep(1)}
+            className={`p-2.5 rounded-xl transition flex flex-col items-center gap-1.5 ${
+              currentStep === 1
+                ? 'bg-emerald-600 text-white font-black shadow-md'
+                : currentStep > 1
+                ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
+                : 'bg-slate-50 text-slate-400 font-medium'
+            }`}
+          >
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+              currentStep === 1 ? 'bg-white text-emerald-700' : currentStep > 1 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
+            }`}>
+              {currentStep > 1 ? <Check className="w-3.5 h-3.5" /> : '1'}
+            </div>
+            <span className="hidden sm:inline text-[11px] truncate">1. NIK / BPJS</span>
+            <span className="sm:hidden text-[10px]">Identitas</span>
+          </button>
+
+          {/* Step 2 */}
+          <button
+            onClick={() => setCurrentStep(2)}
+            className={`p-2.5 rounded-xl transition flex flex-col items-center gap-1.5 ${
+              currentStep === 2
+                ? 'bg-emerald-600 text-white font-black shadow-md'
+                : currentStep > 2
+                ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
+                : 'bg-slate-50 text-slate-400 font-medium'
+            }`}
+          >
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+              currentStep === 2 ? 'bg-white text-emerald-700' : currentStep > 2 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
+            }`}>
+              {currentStep > 2 ? <Check className="w-3.5 h-3.5" /> : '2'}
+            </div>
+            <span className="hidden sm:inline text-[11px] truncate">2. Pilih Klaster</span>
+            <span className="sm:hidden text-[10px]">Klaster</span>
+          </button>
+
+          {/* Step 3 */}
+          <button
+            onClick={() => setCurrentStep(3)}
+            className={`p-2.5 rounded-xl transition flex flex-col items-center gap-1.5 ${
+              currentStep === 3
+                ? 'bg-emerald-600 text-white font-black shadow-md'
+                : currentStep > 3
+                ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
+                : 'bg-slate-50 text-slate-400 font-medium'
+            }`}
+          >
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+              currentStep === 3 ? 'bg-white text-emerald-700' : currentStep > 3 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
+            }`}>
+              {currentStep > 3 ? <Check className="w-3.5 h-3.5" /> : '3'}
+            </div>
+            <span className="hidden sm:inline text-[11px] truncate">3. Dokter & Jam</span>
+            <span className="sm:hidden text-[10px]">Dokter</span>
+          </button>
+
+          {/* Step 4 */}
+          <button
+            onClick={() => setCurrentStep(4)}
+            className={`p-2.5 rounded-xl transition flex flex-col items-center gap-1.5 ${
+              currentStep === 4
+                ? 'bg-emerald-600 text-white font-black shadow-md'
+                : currentStep > 4
+                ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200'
+                : 'bg-slate-50 text-slate-400 font-medium'
+            }`}
+          >
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+              currentStep === 4 ? 'bg-white text-emerald-700' : currentStep > 4 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'
+            }`}>
+              {currentStep > 4 ? <Check className="w-3.5 h-3.5" /> : '4'}
+            </div>
+            <span className="hidden sm:inline text-[11px] truncate">4. Keluhan</span>
+            <span className="sm:hidden text-[10px]">Keluhan</span>
+          </button>
+
+          {/* Step 5 */}
+          <button
+            onClick={() => setCurrentStep(5)}
+            className={`p-2.5 rounded-xl transition flex flex-col items-center gap-1.5 ${
+              currentStep === 5
+                ? 'bg-emerald-600 text-white font-black shadow-md'
+                : 'bg-slate-50 text-slate-400 font-medium'
+            }`}
+          >
+            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+              currentStep === 5 ? 'bg-white text-emerald-700' : 'bg-slate-200 text-slate-500'
+            }`}>
+              5
+            </div>
+            <span className="hidden sm:inline text-[11px] truncate">5. Cetak Tiket</span>
+            <span className="sm:hidden text-[10px]">Cetak</span>
+          </button>
+
+        </div>
+      </div>
+
+      {/* Error Banner */}
+      {errorMessage && (
+        <div className="bg-rose-50 border border-rose-300 text-rose-800 p-4 rounded-2xl flex items-center gap-3 text-xs sm:text-sm animate-fadeIn">
+          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+          <p className="font-semibold">{errorMessage}</p>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* STEP 1: MASUKKAN NIK / NO BPJS & DATA PASIEN */}
+      {/* ========================================================================= */}
+      {currentStep === 1 && (
+        <div className="space-y-6">
+          {/* Search Card */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-slate-200 space-y-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <Search className="w-5 h-5 text-emerald-600" />
+                  <span>Pencarian Cepat Berdasarkan NIK / BPJS</span>
+                </h3>
                 <p className="text-xs text-slate-500">
-                  Sistem akan secara otomatis mencari identitas Anda di Database Rekam Medis Puskesmas Pondok Benda.
+                  Ketik NIK KTP (16 Digit) atau Nomor Kartu BPJS untuk mengisi otomatis data rekam medis.
                 </p>
               </div>
 
-              <div className="w-12 h-12 bg-emerald-100 rounded-2xl text-emerald-700 flex items-center justify-center font-bold">
-                <Search className="w-6 h-6" />
-              </div>
-            </div>
-
-            {/* Direct Search Form */}
-            <form onSubmit={handleSearchPatient} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="sm:col-span-1">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Metode Pencarian
-                  </label>
-                  <select
-                    value={searchSource}
-                    onChange={(e) => setSearchSource(e.target.value as 'NIK' | 'BPJS')}
-                    className="w-full px-3 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    <option value="NIK">Nomor NIK KTP (16 Digit)</option>
-                    <option value="BPJS">Nomor Kartu BPJS Kesehatan</option>
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Ketik {searchSource === 'NIK' ? '16 Digit NIK KTP' : 'Nomor BPJS'} <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <CreditCard className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="text"
-                        maxLength={16}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder={`Ketik ${searchSource === 'NIK' ? 'NIK KTP' : 'No. BPJS'}...`}
-                        className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        required
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs sm:text-sm shadow-md transition flex items-center gap-2 shrink-0"
-                    >
-                      <Search className="w-4 h-4" />
-                      <span>Cari Data</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </form>
-
-            {/* Direct Search Result Notification */}
-            {searchHasRun && (
-              <div className="pt-2">
-                {foundPatient ? (
-                  <div className="p-5 bg-emerald-50 border-2 border-emerald-500/60 rounded-2xl space-y-3 animate-fadeIn shadow-sm">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-emerald-900 font-black text-sm">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                        <span>DATA PASIEN TERDAFTAR DITEMUKAN!</span>
-                      </div>
-                      <span className="bg-emerald-200 text-emerald-950 text-xs font-extrabold px-3 py-1 rounded-full border border-emerald-300">
-                        Puskesmas Verified ✓
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-white/90 p-4 rounded-xl border border-emerald-200 text-xs text-slate-800">
-                      <div>
-                        <span className="text-slate-500">Nama Lengkap Pasien:</span>
-                        <div className="font-extrabold text-slate-900 text-base">{foundPatient.fullName}</div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Umur Pasien Saat Ini:</span>
-                        <div className="font-bold text-slate-900">{calculateAge(foundPatient.birthDate)} Tahun ({foundPatient.birthDate})</div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Nomor NIK KTP / BPJS:</span>
-                        <div className="font-semibold text-slate-900">{foundPatient.nik} {foundPatient.bpjsNumber ? `(BPJS: ${foundPatient.bpjsNumber})` : ''}</div>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">Alamat Rumah:</span>
-                        <div className="font-semibold text-slate-900">{foundPatient.address}</div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end pt-1">
-                      <button
-                        type="button"
-                        onClick={handleProceedToStep2}
-                        className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs sm:text-sm shadow-md transition flex items-center gap-2"
-                      >
-                        <span>Gunakan Data Ini & Lanjut Tahap 2</span>
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="p-5 bg-amber-50 border border-amber-200 rounded-2xl space-y-3 animate-fadeIn">
-                    <div className="flex items-center gap-2 text-amber-900 font-black text-sm">
-                      <UserPlus className="w-5 h-5 text-amber-600" />
-                      <span>Data NIK / BPJS Belum Terdaftar</span>
-                    </div>
-                    <p className="text-xs text-amber-800">
-                      Nomor <strong className="font-bold">{searchQuery}</strong> belum ditemukan di database lokal. Anda dapat mendaftar sebagai <strong className="font-bold">Pasien Baru</strong> dengan melengkapi profil di Tahap 2.
-                    </p>
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        onClick={handleProceedToStep2}
-                        className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs shadow transition flex items-center gap-1.5"
-                      >
-                        <span>Daftar Pasien Baru & Lanjut Tahap 2</span>
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Step 1 Footer Action */}
-            <div className="pt-4 border-t border-slate-100 flex justify-end">
+              {/* Sample patient quick filler */}
               <button
                 type="button"
-                onClick={handleProceedToStep2}
-                className="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-sm shadow-lg shadow-emerald-600/20 transition flex items-center gap-2"
+                onClick={() => {
+                  setSearchQuery('3671042306040003');
+                  setSearchSource('NIK');
+                  handleSearchPatient();
+                }}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 transition"
               >
-                <span>Lanjut ke Tahap 2: Verifikasi Data</span>
-                <ChevronRight className="w-4 h-4" />
+                <Zap className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Contoh Pasien: ADAM AZRA</span>
               </button>
             </div>
 
-          </div>
-        )}
+            {/* Radio Source */}
+            <div className="flex items-center gap-4 text-xs font-bold">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="searchSource"
+                  checked={searchSource === 'NIK'}
+                  onChange={() => setSearchSource('NIK')}
+                  className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>Gunakan NIK KTP (16 Digit)</span>
+              </label>
 
-        {/* ========================================================================= */}
-        {/* TAHAP 2: VERIFIKASI & PROFIL KELENGKAPAN PASIEN */}
-        {/* ========================================================================= */}
-        {currentStep === 2 && (
-          <div className="p-6 sm:p-8 space-y-6 animate-fadeIn">
-            
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="space-y-1">
-                <span className="text-xs font-extrabold text-emerald-700 uppercase tracking-wider">
-                  Tahap 2 dari 3: Verifikasi Profil
-                </span>
-                <h3 className="text-xl font-black text-slate-900">Verifikasi & Profil Pasien</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="searchSource"
+                  checked={searchSource === 'BPJS'}
+                  onChange={() => setSearchSource('BPJS')}
+                  className="w-4 h-4 text-emerald-600 focus:ring-emerald-500"
+                />
+                <span>Gunakan No. Kartu BPJS</span>
+              </label>
+            </div>
+
+            {/* Search Input Group */}
+            <form onSubmit={handleSearchPatient} className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={
+                    searchSource === 'NIK'
+                      ? 'Masukkan 16 digit NIK KTP (contoh: 3671042306040003)...'
+                      : 'Masukkan nomor kartu BPJS Kesehatan...'
+                  }
+                  className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-300 focus:border-emerald-600 focus:bg-white rounded-xl text-sm font-mono font-bold text-slate-900 transition outline-none"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm rounded-xl transition shadow-md flex items-center gap-2 shrink-0"
+              >
+                <Search className="w-4 h-4" />
+                <span>Cari Data</span>
+              </button>
+            </form>
+
+            {searchHasRun && (
+              <div className={`p-4 rounded-2xl text-xs flex items-center justify-between border ${
+                foundPatient ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : 'bg-amber-50 border-amber-300 text-amber-900'
+              }`}>
+                <div className="flex items-center gap-2.5">
+                  {foundPatient ? <UserCheck className="w-5 h-5 text-emerald-600 shrink-0" /> : <UserPlus className="w-5 h-5 text-amber-600 shrink-0" />}
+                  <div>
+                    <span className="font-bold block text-sm">
+                      {foundPatient ? `Pasien Ditemukan: ${foundPatient.fullName}` : 'Data Pasien Belum Terdaftar (Pasien Baru)'}
+                    </span>
+                    <span className="text-[11px] opacity-80">
+                      {foundPatient
+                        ? `No. RM: ${foundPatient.medicalRecordNo || '03304104'} • Tanggal Lahir: ${foundPatient.birthDate} • Umur: ${calculateDetailedAge(foundPatient.birthDate)}`
+                        : 'Silakan lengkapi formulir identitas di bawah untuk membuat e-tiket antrean.'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Detailed Patient Identity Form */}
+          <div className="bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+              <div>
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <User className="w-5 h-5 text-emerald-600" />
+                  <span>Kelengkapan Data Pasien</span>
+                </h3>
                 <p className="text-xs text-slate-500">
-                  Periksa kebenaran Nama Lengkap, Umur, Jenis Kelamin, Alamat, dan Jenis Pembayaran (BPJS/Umum).
+                  Data ini akan tercetak secara akurat pada struk fisik Tiket Kunjungan.
                 </p>
               </div>
 
-              <div className="w-12 h-12 bg-emerald-100 rounded-2xl text-emerald-700 flex items-center justify-center font-bold">
-                <UserCheck className="w-6 h-6" />
-              </div>
-            </div>
-
-            {/* Payment Category Selector */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                1. Kategori Jaminan Berobat Pasien
-              </label>
-              <div className="grid grid-cols-2 gap-3">
+              {/* Patient Type (BPJS / Umum) */}
+              <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
                 <button
                   type="button"
                   onClick={() => setPatientType('BPJS')}
-                  className={`p-3.5 rounded-xl border-2 text-left transition flex items-center justify-between ${
-                    patientType === 'BPJS'
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold'
-                      : 'border-slate-200 text-slate-700 bg-slate-50'
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    patientType === 'BPJS' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    <span className="text-xs font-bold">BPJS Kesehatan (Gratis)</span>
-                  </div>
-                  {patientType === 'BPJS' && <Check className="w-4 h-4 text-emerald-600" />}
+                  BPJS (Gratis)
                 </button>
-
                 <button
                   type="button"
                   onClick={() => setPatientType('Umum')}
-                  className={`p-3.5 rounded-xl border-2 text-left transition flex items-center justify-between ${
-                    patientType === 'Umum'
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-950 font-bold'
-                      : 'border-slate-200 text-slate-700 bg-slate-50'
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    patientType === 'Umum' ? 'bg-emerald-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-slate-700" />
-                    <span className="text-xs font-bold">Pasien Umum / Non-BPJS</span>
-                  </div>
-                  {patientType === 'Umum' && <Check className="w-4 h-4 text-emerald-600" />}
+                  Umum (Rp 10.000)
                 </button>
               </div>
             </div>
 
-            {/* Patient Form Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              {/* NIK Field */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nomor NIK KTP Pasien <span className="text-rose-500">*</span>
-                </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+              
+              {/* NIK */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">NIK KTP Pasien (16 Digit) *</label>
                 <input
                   type="text"
                   maxLength={16}
                   value={nik}
-                  onChange={(e) => setNik(e.target.value.replace(/\D/g, ''))}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  required
+                  onChange={(e) => setNik(e.target.value)}
+                  placeholder="Masukkan 16 digit NIK..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono font-bold text-slate-900 focus:bg-white focus:border-emerald-600 outline-none placeholder:font-sans placeholder:font-normal"
                 />
               </div>
 
-              {/* BPJS Number Field */}
-              {patientType === 'BPJS' && (
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Nomor BPJS Kesehatan <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    maxLength={13}
-                    value={bpjsNumber}
-                    onChange={(e) => setBpjsNumber(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    required
-                  />
-                </div>
-              )}
-
-              {/* Full Name */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nama Lengkap Pasien <span className="text-rose-500">*</span>
-                </label>
+              {/* Nama Lengkap */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">Nama Lengkap Pasien *</label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  required
+                  placeholder="Nama lengkap pasien sesuai KTP/KK..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold uppercase text-slate-900 focus:bg-white focus:border-emerald-600 outline-none placeholder:font-normal placeholder:capitalize"
                 />
               </div>
 
-              {/* Birthdate & Calculated Age */}
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Tanggal Lahir Pasien
-                  </label>
-                  <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">
-                    Umur Pasien: {patientAge} Tahun
-                  </span>
-                </div>
+              {/* Tanggal Lahir */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">Tanggal Lahir *</label>
                 <input
                   type="date"
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-emerald-600 outline-none"
                 />
               </div>
 
-              {/* Gender */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Jenis Kelamin
-                </label>
-                <div className="flex gap-4 pt-1">
-                  <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="gender"
-                      checked={gender === 'L'}
-                      onChange={() => setGender('L')}
-                      className="text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span>Laki-laki (L)</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="gender"
-                      checked={gender === 'P'}
-                      onChange={() => setGender('P')}
-                      className="text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span>Perempuan (P)</span>
-                  </label>
-                </div>
+              {/* Jenis Kelamin */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">Jenis Kelamin</label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value as Gender)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-emerald-600 outline-none"
+                >
+                  <option value="L">Laki-laki</option>
+                  <option value="P">Perempuan</option>
+                </select>
               </div>
 
-              {/* Phone / WA */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Nomor Telepon / WhatsApp <span className="text-rose-500">*</span>
-                </label>
+              {/* No. HP / WhatsApp */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">No. HP / WhatsApp *</label>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0812xxxxxxxx"
-                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  required
+                  placeholder="Nomor HP/WA (cth: 08123456789)..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-emerald-600 outline-none placeholder:font-normal"
                 />
               </div>
+
+              {/* No RM */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">No. Rekam Medis (No RM)</label>
+                <input
+                  type="text"
+                  value={medicalRecordNo}
+                  onChange={(e) => setMedicalRecordNo(e.target.value)}
+                  placeholder="Nomor RM (otomatis/opsional)"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-900 focus:bg-white focus:border-emerald-600 outline-none placeholder:font-sans placeholder:font-normal"
+                />
+              </div>
+
+              {/* RM Lama */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">RM. Lama</label>
+                <input
+                  type="text"
+                  value={oldMedicalRecordNo}
+                  onChange={(e) => setOldMedicalRecordNo(e.target.value)}
+                  placeholder="Nomor RM lama (opsional)"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-900 focus:bg-white focus:border-emerald-600 outline-none placeholder:font-sans placeholder:font-normal"
+                />
+              </div>
+
+              {/* No. Dokumen RM */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-700">No. Dokumen RM</label>
+                <input
+                  type="text"
+                  value={documentRmNo}
+                  onChange={(e) => setDocumentRmNo(e.target.value)}
+                  placeholder="Nomor dokumen RM (opsional)"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-mono text-slate-900 focus:bg-white focus:border-emerald-600 outline-none placeholder:font-sans placeholder:font-normal"
+                />
+              </div>
+
+              {/* Alamat Lengkap */}
+              <div className="sm:col-span-2 lg:col-span-3 space-y-1">
+                <label className="font-bold text-slate-700">Alamat Lengkap KTP / Domisili *</label>
+                <textarea
+                  rows={2}
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Alamat lengkap domisili / KTP (jalan, RT/RW, kelurahan, kecamatan, kota)..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-semibold text-slate-900 uppercase focus:bg-white focus:border-emerald-600 outline-none placeholder:font-normal placeholder:capitalize"
+                />
+              </div>
+
             </div>
 
-            {/* Address */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Alamat Rumah / Tempat Tinggal
-              </label>
-              <textarea
-                rows={2}
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+            {/* Calculated Age Preview Badge */}
+            <div className="bg-slate-100 p-3.5 rounded-2xl flex items-center justify-between text-xs">
+              <span className="text-slate-600 font-medium">Umur Terhitung Otomatis:</span>
+              <span className="font-mono font-bold text-emerald-800 bg-white px-3 py-1 rounded-xl border border-slate-300">
+                {calculatedDetailedAgeStr}
+              </span>
             </div>
 
-            {/* Step 2 Action Buttons */}
-            <div className="pt-4 border-t border-slate-100 flex items-center justify-between gap-4">
+            {/* Navigation Next Step */}
+            <div className="pt-2 flex justify-end">
               <button
                 type="button"
-                onClick={() => setCurrentStep(1)}
-                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs sm:text-sm transition flex items-center gap-2"
+                onClick={() => {
+                  if (!nik || !fullName) {
+                    setErrorMessage('Silakan isi NIK dan Nama Lengkap Pasien terlebih dahulu.');
+                    return;
+                  }
+                  setErrorMessage('');
+                  setCurrentStep(2);
+                }}
+                className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm rounded-xl transition shadow-md flex items-center gap-2"
               >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Kembali Tahap 1</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleProceedToStep3}
-                className="px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-sm shadow-lg shadow-emerald-600/20 transition flex items-center gap-2"
-              >
-                <span>Lanjut ke Tahap 3: Pilih Poli & ML</span>
+                <span>Lanjut: Pilih Klaster (1-4)</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
-
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ========================================================================= */}
-        {/* TAHAP 3: PEMILIHAN POLIKLINIK & EVALUASI RANDOM FOREST ML */}
-        {/* ========================================================================= */}
-        {currentStep === 3 && (
-          <form onSubmit={handleSubmitFinal} className="p-6 sm:p-8 space-y-6 animate-fadeIn">
-            
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-              <div className="space-y-1">
-                <span className="text-xs font-extrabold text-emerald-700 uppercase tracking-wider">
-                  Tahap 3 dari 3: Poliklinik & Model ML
-                </span>
-                <h3 className="text-xl font-black text-slate-900">Poliklinik Tujuan & Evaluasi Random Forest ML</h3>
-                <p className="text-xs text-slate-500">
-                  Model Random Forest Classifier memprediksi <strong className="text-slate-900">Slot Tersedia (Ya/Tidak)</strong>, <strong className="text-slate-900">Status Pendaftaran</strong>, dan <strong className="text-slate-900">Estimasi Waktu Tunggu</strong>.
-                </p>
+      {/* ========================================================================= */}
+      {/* STEP 2: PILIH KLASTER 1, 2, 3, 4 */}
+      {/* ========================================================================= */}
+      {currentStep === 2 && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full w-fit mb-2 border border-emerald-200">
+                <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Standar Integrasi Pelayanan Primer (ILP)</span>
               </div>
-
-              <div className="w-12 h-12 bg-emerald-100 rounded-2xl text-emerald-700 flex items-center justify-center font-bold">
-                <BrainCircuit className="w-6 h-6" />
-              </div>
+              <h3 className="text-xl font-black text-slate-900">
+                Pilih Klaster Pelayanan Pasien (Klaster 1, 2, 3, 4)
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Sesuaikan klaster dengan kategori usia dan kebutuhan medis pasien:
+              </p>
             </div>
 
-            {/* Patient Summary Bar */}
-            <div className="p-4 bg-slate-900 text-white rounded-xl text-xs flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-slate-400 font-medium">Profil Pasien Terverifikasi:</div>
-                <div className="text-sm font-black text-emerald-400">{fullName} ({patientAge} Tahun)</div>
-                <div className="text-[11px] text-slate-300">NIK: {nik} • {patientType} {bpjsNumber ? `(BPJS: ${bpjsNumber})` : ''}</div>
+            {/* 4 Klaster Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {KLASTER_LIST.map((klaster) => {
+                const IconComponent = klaster.icon;
+                const isSelected = selectedKlasterNumber === klaster.number;
+
+                return (
+                  <div
+                    key={klaster.number}
+                    onClick={() => handleSelectKlaster(klaster)}
+                    className={`p-5 rounded-3xl border-2 transition-all cursor-pointer relative overflow-hidden bg-gradient-to-br ${klaster.bgColor} ${
+                      isSelected
+                        ? 'border-emerald-600 ring-2 ring-emerald-400/40 shadow-lg scale-[1.01]'
+                        : 'border-slate-200 hover:border-slate-400 hover:shadow-md'
+                    }`}
+                  >
+                    {/* Top Tag & Selection Badge */}
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                          isSelected ? 'bg-emerald-600 text-white' : 'bg-white text-slate-700 border border-slate-200'
+                        }`}>
+                          <IconComponent className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${klaster.badgeColor}`}>
+                            {klaster.badge}
+                          </span>
+                          <h4 className="text-base font-extrabold text-slate-900 block mt-0.5">
+                            Klaster {klaster.number}
+                          </h4>
+                        </div>
+                      </div>
+
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center border transition ${
+                        isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300 bg-white'
+                      }`}>
+                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                      </div>
+                    </div>
+
+                    {/* Tagline & Description */}
+                    <div className="space-y-1.5 mb-4">
+                      <p className="text-xs font-bold text-slate-800">
+                        {klaster.tagline}
+                      </p>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        {klaster.description}
+                      </p>
+                    </div>
+
+                    {/* Sub-services pills */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-200/80">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Layanan Terkait:
+                      </span>
+                      <div className="space-y-1">
+                        {klaster.services.map((srv) => (
+                          <div
+                            key={srv.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectKlaster(klaster);
+                              handleSelectService(srv);
+                            }}
+                            className={`p-2 rounded-xl text-xs transition flex items-center justify-between ${
+                              selectedServiceId === srv.id && isSelected
+                                ? 'bg-emerald-600 text-white font-bold shadow-xs'
+                                : 'bg-white/80 hover:bg-white text-slate-800 border border-slate-200'
+                            }`}
+                          >
+                            <span className="truncate">{srv.name}</span>
+                            {selectedServiceId === srv.id && isSelected && (
+                              <Check className="w-3 h-3 shrink-0" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Klaster Selection Confirmation Card */}
+            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex items-center justify-between text-xs">
+              <div className="space-y-0.5">
+                <span className="text-emerald-800 font-medium block">Klaster & Layanan Terpilih:</span>
+                <span className="text-slate-900 font-extrabold text-sm">
+                  KLASTER {selectedKlasterNumber} • {selectedPoliName}
+                </span>
               </div>
+              <span className="text-emerald-700 font-bold bg-white px-3 py-1 rounded-xl border border-emerald-300">
+                Poli: {selectedPoliId}
+              </span>
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="pt-2 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setCurrentStep(1)}
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Kembali ke Identitas</span>
+              </button>
 
               <button
                 type="button"
-                onClick={() => setCurrentStep(2)}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs border border-slate-700 transition"
+                onClick={() => setCurrentStep(3)}
+                className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm rounded-xl transition shadow-md flex items-center gap-2"
               >
-                Ubah Profil Pasien
+                <span>Lanjut: Pilih Dokter & Jam</span>
+                <ChevronRight className="w-4 h-4" />
               </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* Poliklinik & Schedule Selection */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Pilih Poliklinik Tujuan <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <Stethoscope className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600" />
-                  <select
-                    value={poliId}
-                    onChange={(e) => setPoliId(e.target.value)}
-                    className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    {polis.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        [{p.code}] {p.name} ({p.room}) - Antrean: {p.totalWaiting || 0} Pasien
-                      </option>
-                    ))}
-                  </select>
-                </div>
+      {/* ========================================================================= */}
+      {/* STEP 3: PILIH DOKTER & JAM / SESI LAYANAN */}
+      {/* ========================================================================= */}
+      {currentStep === 3 && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <Stethoscope className="w-5 h-5 text-emerald-600" />
+                <span>Pilih Dokter & Jam Sesi Layanan</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Tentukan dokter penanggung jawab klaster dan jam kedatangan yang diinginkan.
+              </p>
+            </div>
+
+            {/* Doctor Selection Grid */}
+            <div className="space-y-3">
+              <label className="font-extrabold text-slate-800 text-xs sm:text-sm block">
+                1. Dokter Bertugas di Klaster {selectedKlasterNumber} ({selectedPoliName}):
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filteredDoctors.map((doc) => {
+                  const isDocSelected = selectedDoctorName === doc.doctorName;
+                  return (
+                    <div
+                      key={doc.id}
+                      onClick={() => setSelectedDoctorName(doc.doctorName)}
+                      className={`p-4 rounded-2xl border-2 transition cursor-pointer flex items-center justify-between ${
+                        isDocSelected
+                          ? 'bg-emerald-50 border-emerald-600 ring-2 ring-emerald-400/30 shadow-md'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <span className="font-black text-slate-900 block text-xs sm:text-sm">
+                          {doc.doctorName}
+                        </span>
+                        <span className="text-[11px] text-slate-600 block">
+                          {doc.specialty}
+                        </span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full inline-block">
+                          Status: {doc.status}
+                        </span>
+                      </div>
+
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center border shrink-0 ${
+                        isDocSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'border-slate-300'
+                      }`}>
+                        {isDocSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Tanggal Kunjungan Berobat <span className="text-rose-500">*</span>
+            {/* Date and Time Slots */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-200">
+              
+              {/* Appointment Date */}
+              <div className="space-y-2">
+                <label className="font-extrabold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-emerald-600" />
+                  <span>2. Tanggal Kunjungan:</span>
                 </label>
-                <div className="relative">
-                  <Calendar className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="date"
-                    value={appointmentDate}
-                    min={new Date().toISOString().split('T')[0]}
-                    max={(() => {
-                      const d = new Date();
-                      d.setMonth(d.getMonth() + 1);
-                      return d.toISOString().split('T')[0];
-                    })()}
-                    onChange={(e) => setAppointmentDate(e.target.value)}
-                    className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                  *Maksimal pendaftaran 1 bulan ke depan dari hari ini.
+                <input
+                  type="date"
+                  value={appointmentDate}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={(e) => setAppointmentDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white focus:border-emerald-600 outline-none text-sm"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Dapat memesan hingga 1 bulan ke depan.
                 </p>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Sesi Jam Datang
+              {/* Time Slots */}
+              <div className="space-y-2">
+                <label className="font-extrabold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-emerald-600" />
+                  <span>3. Jam Sesi Layanan:</span>
                 </label>
-                <div className="relative">
-                  <Clock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <select
-                    value={timeSlot}
-                    onChange={(e) => setTimeSlot(e.target.value)}
-                    className="w-full pl-10 pr-3 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    <option value="08:00 - 10:00 WIB">Sesi Pagi (08:00 - 10:00 WIB)</option>
-                    <option value="10:00 - 12:00 WIB">Sesi Siang Awal (10:00 - 12:00 WIB)</option>
-                    <option value="12:00 - 14:00 WIB">Sesi Siang Akhir (12:00 - 14:00 WIB)</option>
-                  </select>
+                
+                <div className="space-y-2">
+                  {TIME_SLOTS.map((slot) => {
+                    const isSlotSelected = selectedTimeSlot === slot.time;
+                    return (
+                      <div
+                        key={slot.id}
+                        onClick={() => setSelectedTimeSlot(slot.time)}
+                        className={`p-3 rounded-xl border transition cursor-pointer flex items-center justify-between text-xs ${
+                          isSlotSelected
+                            ? 'bg-emerald-600 text-white font-bold shadow-xs border-emerald-600'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
+                        }`}
+                      >
+                        <div>
+                          <span className="block font-mono">{slot.time}</span>
+                          <span className={`text-[10px] ${isSlotSelected ? 'text-emerald-100' : 'text-slate-500'}`}>
+                            {slot.quota}
+                          </span>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center border ${
+                          isSlotSelected ? 'bg-white text-emerald-700' : 'border-slate-300'
+                        }`}>
+                          {isSlotSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Keluhan Utama / Catatan Periksa
-                </label>
-                <input
-                  type="text"
-                  value={chiefComplaint}
-                  onChange={(e) => setChiefComplaint(e.target.value)}
-                  placeholder="Flu batuk, pusing, demam, periksa hamil, cabut gigi..."
-                  className="w-full px-3 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
+            </div>
+
+            {/* Navigation Buttons */}
+            <div className="pt-2 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setCurrentStep(2)}
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Kembali ke Klaster</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCurrentStep(4)}
+                className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm rounded-xl transition shadow-md flex items-center gap-2"
+              >
+                <span>Lanjut: Masukkan Keluhan</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* STEP 4: MASUKKAN KELUHAN PASIEN */}
+      {/* ========================================================================= */}
+      {currentStep === 4 && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+            <div>
+              <h3 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-emerald-600" />
+                <span>Keluhan Utama / Alasan Berobat</span>
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Deskripsikan gejala atau tujuan pemeriksaan pasien agar dokter dapat mempersiapkan rekam medis.
+              </p>
+            </div>
+
+            {/* Quick Complaint Tags */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                <span>Pilih Keluhan Cepat (Opsional):</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_COMPLAINTS.map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setChiefComplaint(item)}
+                    className={`px-3 py-1.5 rounded-xl text-xs transition border text-left ${
+                      chiefComplaint === item
+                        ? 'bg-emerald-600 text-white font-bold border-emerald-600'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Random Forest ML Prediction Engine Card */}
-            <div className="pt-2 space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                Hasil Prediksi Machine Learning (Slot Tersedia & Waktu Tunggu)
+            {/* Main Textarea */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">
+                Catatan Keluhan / Gejala Medis Pasien:
               </label>
-
-              <RandomForestWidget
-                poliId={selectedPoli.id}
-                poliName={selectedPoli.name}
-                waitingCount={selectedPoli.totalWaiting || 3}
-                timeSlot={timeSlot}
-                patientAge={patientAge}
-                gender={gender}
-                patientType={patientType}
+              <textarea
+                rows={4}
+                value={chiefComplaint}
+                onChange={(e) => setChiefComplaint(e.target.value)}
+                placeholder="Contoh: Demam tinggi sejak 2 hari yang lalu disertai batuk berdahak dan tenggorokan sakit..."
+                className="w-full p-4 bg-slate-50 border border-slate-300 rounded-2xl font-medium text-slate-900 focus:bg-white focus:border-emerald-600 outline-none text-sm"
               />
             </div>
 
-            {/* Final Form Navigation & Submit */}
-            <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Navigation Buttons */}
+            <div className="pt-2 flex items-center justify-between">
               <button
                 type="button"
-                onClick={() => setCurrentStep(2)}
-                className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs sm:text-sm transition flex items-center justify-center gap-2"
+                onClick={() => setCurrentStep(3)}
+                className="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition flex items-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Kembali Tahap 2</span>
+                <span>Kembali ke Dokter & Jam</span>
               </button>
 
               <button
-                type="submit"
-                disabled={loading}
-                className="w-full sm:w-auto px-8 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-sm shadow-lg shadow-emerald-600/20 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                type="button"
+                onClick={() => setCurrentStep(5)}
+                className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs sm:text-sm rounded-xl transition shadow-md flex items-center gap-2"
               >
-                {loading ? (
+                <span>Lanjut: Konfirmasi & Cetak Tiket</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* STEP 5: KONFIRMASI & CETAK TIKET KUNJUNGAN */}
+      {/* ========================================================================= */}
+      {currentStep === 5 && (
+        <div className="space-y-6">
+          <div className="bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-slate-200 space-y-6">
+            <div>
+              <div className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full mb-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span>Langkah Terakhir: Terbitkan & Cetak Tiket</span>
+              </div>
+              <h3 className="text-xl font-black text-slate-900">
+                Konfirmasi Tiket Kunjungan Pasien
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Periksa kembali data di bawah. Klik tombol <strong>"Terbitkan & Cetak Tiket Kunjungan"</strong> untuk menghasilkan struk fisik antrean.
+              </p>
+            </div>
+
+            {/* Thermal Receipt Preview Box */}
+            <div className="bg-slate-50 p-5 sm:p-6 rounded-3xl border border-slate-300 max-w-lg mx-auto shadow-inner">
+              <div className="bg-white p-6 rounded-2xl border border-slate-300 shadow-sm font-mono text-xs space-y-3">
+                <div className="text-center space-y-0.5 pb-2 border-b border-dashed border-slate-300">
+                  <h4 className="text-sm font-black uppercase text-slate-900">TIKET KUNJUNGAN</h4>
+                  <div className="font-bold text-slate-800">KLASTER {selectedKlasterNumber}</div>
+                  <div className="font-bold text-slate-800">{selectedPoliName}</div>
+                </div>
+
+                <div className="text-center py-1 space-y-0.5">
+                  <span className="text-[11px] text-slate-500">No. Antrean Estimasi:</span>
+                  <div className="text-3xl font-black text-emerald-700 tracking-tight">
+                    {getQueuePrefix()}-0013
+                  </div>
+                  <div className="text-[11px] text-slate-700 font-semibold">
+                    Dokter: {selectedDoctorName}
+                  </div>
+                  <div className="text-[11px] text-slate-700">
+                    Jam: {selectedTimeSlot}
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-2 border-t border-dashed border-slate-300 text-[11px]">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">NIK:</span>
+                    <span className="font-bold">{nik}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Nama:</span>
+                    <span className="font-bold uppercase">{fullName}</span>
+                  </div>
+                  {familyHead ? (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Ayah/KK:</span>
+                      <span className="uppercase">{familyHead}</span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Umur:</span>
+                    <span>{calculatedDetailedAgeStr}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Asuransi:</span>
+                    <span className="font-bold">{patientType === 'BPJS' ? 'BPJS Kesehatan' : 'Pasien Umum'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Biaya:</span>
+                    <span className="font-bold">{patientType === 'BPJS' ? 'Rp. 0 (BPJS)' : 'Rp. 10,000'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Submit Action */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setCurrentStep(4)}
+                className="w-full sm:w-auto px-5 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm rounded-xl transition flex items-center justify-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Ubah Keluhan</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleSubmitRegistration}
+                className="w-full sm:w-auto px-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm rounded-2xl transition shadow-xl flex items-center justify-center gap-2.5 disabled:opacity-50"
+              >
+                {submitting ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     <span>Menerbitkan E-Tiket...</span>
                   </>
                 ) : (
                   <>
-                    <FileText className="w-4 h-4" />
-                    <span>Terbitkan E-Tiket Antrean Online (Selesai)</span>
-                    <ChevronRight className="w-4 h-4" />
+                    <Printer className="w-5 h-5" />
+                    <span>Terbitkan & Cetak Tiket Kunjungan</span>
                   </>
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
 
-          </form>
-        )}
-
-      </div>
     </div>
   );
 };
