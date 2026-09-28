@@ -4,6 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { INITIAL_POLIS, INITIAL_DOCTORS, INITIAL_ARTICLES, INITIAL_ANNOUNCEMENTS, INITIAL_TICKETS } from './src/data/mockData.js';
 import { QueueTicket, PoliService, SurveySubmission, SurveyStats } from './src/types.js';
+import { initDbConnection, isDbConnected, queryDb, getDbConfig } from './src/db.js';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -11,13 +12,63 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// In-Memory Data Stores
+// In-Memory Data Stores (used as active cache and seamless fallback)
 let polisStore: PoliService[] = [...INITIAL_POLIS];
 let doctorsStore = [...INITIAL_DOCTORS];
 let articlesStore = [...INITIAL_ARTICLES];
 let announcementsStore = [...INITIAL_ANNOUNCEMENTS];
 let ticketsStore: QueueTicket[] = [...INITIAL_TICKETS];
 let surveysStore: SurveySubmission[] = [];
+
+// Helper to sync from MySQL database if connected
+async function syncFromDbIfAvailable() {
+  if (!isDbConnected()) return;
+  try {
+    const dbTickets = await queryDb<any>('SELECT * FROM queue_tickets ORDER BY created_at DESC');
+    if (dbTickets && dbTickets.length > 0) {
+      ticketsStore = dbTickets.map(row => ({
+        id: row.id,
+        queueNumber: row.queue_number,
+        patientType: row.patient_type || 'BPJS',
+        nik: row.nik,
+        bpjsNumber: row.bpjs_number || '',
+        fullName: row.full_name,
+        birthDate: row.birth_date ? String(row.birth_date).slice(0, 10) : '1990-01-01',
+        gender: row.gender || 'L',
+        phone: row.phone,
+        address: row.address || '',
+        poliId: row.poli_id,
+        poliName: row.poli_name,
+        klasterNumber: 3,
+        klasterName: row.klaster_name || 'UMUM DEWASA',
+        doctorName: '',
+        registrationNumber: row.registration_number || '',
+        familyHead: 'KEPALA KELUARGA',
+        medicalRecordNo: row.medical_record_no || `03${row.nik?.slice(-6)}`,
+        oldMedicalRecordNo: '',
+        documentRmNo: '',
+        ageFormatted: '',
+        fee: row.patient_type === 'BPJS' ? 'Gratis (BPJS)' : 'Rp. 10,000',
+        appointmentDate: row.appointment_date ? String(row.appointment_date).slice(0, 10) : new Date().toISOString().split('T')[0],
+        timeSlot: row.time_slot || '08:00 - 11:30 WIB',
+        chiefComplaint: row.chief_complaint || 'Pemeriksaan Kesehatan',
+        status: row.status || 'Waiting',
+        createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+        estimatedTime: row.estimated_time || '',
+        timestamp: '',
+        timestampLoket: '',
+        hadir: true,
+        timestampBPU: '',
+        timestampApotek: '',
+        statusBPU: 'Menunggu',
+        timestampLab: ''
+      }));
+      console.log(`[Database] Sinkronisasi ${ticketsStore.length} antrean dari MySQL berhasil.`);
+    }
+  } catch (err: any) {
+    console.error('[Database] Gagal membaca tabel MySQL:', err.message);
+  }
+}
 
 // Helper: Calculate Queue Prefix and next number
 function generateNextQueueNumber(poliId: string): string {
@@ -224,6 +275,41 @@ app.post('/api/pendaftaran', (req, res) => {
     };
 
     ticketsStore.unshift(newTicket);
+
+    // Save to MySQL database asynchronously if connected
+    if (isDbConnected()) {
+      queryDb(`
+        INSERT INTO queue_tickets 
+          (id, queue_number, patient_type, nik, bpjs_number, full_name, birth_date, gender, phone, address, poli_id, poli_name, appointment_date, time_slot, chief_complaint, status, estimated_time, registration_number, klaster_name, medical_record_no)
+        VALUES 
+          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        newTicket.id,
+        newTicket.queueNumber,
+        newTicket.patientType,
+        newTicket.nik,
+        newTicket.bpjsNumber || null,
+        newTicket.fullName,
+        newTicket.birthDate || null,
+        newTicket.gender,
+        newTicket.phone,
+        newTicket.address || null,
+        newTicket.poliId,
+        newTicket.poliName,
+        newTicket.appointmentDate,
+        newTicket.timeSlot || '08:00 - 11:30 WIB',
+        newTicket.chiefComplaint || 'Pemeriksaan',
+        newTicket.status,
+        newTicket.estimatedTime || null,
+        newTicket.registrationNumber || null,
+        newTicket.klasterName || null,
+        newTicket.medicalRecordNo || null
+      ]).then(() => {
+        console.log(`[Database] Tiket ${newTicket.queueNumber} tersimpan ke MySQL`);
+      }).catch(err => {
+        console.error('[Database] Gagal simpan ke MySQL:', err.message);
+      });
+    }
 
     res.json({
       success: true,
@@ -749,6 +835,16 @@ PENTING:
 
 // START SERVER & VITE MIDDLEWARE SETUP
 async function startServer() {
+  // Inisialisasi koneksi database MySQL jika env/service tersedia
+  try {
+    const dbOk = await initDbConnection();
+    if (dbOk) {
+      await syncFromDbIfAvailable();
+    }
+  } catch (err: any) {
+    console.warn('[Database] Lanjut menggunakan fallback cache:', err.message);
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },

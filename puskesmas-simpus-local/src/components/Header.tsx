@@ -15,8 +15,7 @@ import {
   Award,
   Info,
   Newspaper,
-  ListOrdered,
-  Download
+  ListOrdered
 } from 'lucide-react';
 import { PuskesmasLogo } from './PuskesmasLogo';
 import { PoliService, DoctorSchedule, HealthArticle } from '../types';
@@ -155,17 +154,6 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <PhoneCall className="w-3 h-3 text-emerald-300" />
               <span>Call Center / WA: 082311366261</span>
-            </a>
-
-            {/* Direct Project ZIP Bundle Download */}
-            <a
-              href="/puskesmas-simpus-local.zip"
-              download="puskesmas-simpus-local.zip"
-              className="hidden md:flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-md text-[11px] font-bold transition border border-emerald-500 shadow-2xs"
-              title="Unduh 1 Bundle Folder Project (ZIP) untuk Dijalankan di Komputer Lokal"
-            >
-              <Download className="w-3 h-3 text-emerald-200" />
-              <span>Unduh Project Local (.ZIP)</span>
             </a>
 
             {/* Discreet Staff & Admin Login Trigger */}

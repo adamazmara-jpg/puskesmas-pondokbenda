@@ -41,31 +41,77 @@ Sebelum menjalankan aplikasi di komputer lokal (Laptop/PC), pastikan perangkat A
 
 ---
 
-## 💻 3. Cara Manual via Terminal / Command Prompt
+## 💻 3. Cara Membuka & Menjalankan di Visual Studio Code (VS Code)
 
-Jika ingin menjalankan melalui terminal secara manual:
+Bagi pengembang atau mahasiswa yang ingin membuka project ini di **VS Code**:
 
-### Langkah 1: Buka Terminal di Folder Project
-- Buka terminal / command prompt / PowerShell / VSCode Terminal pada direktori project ini.
+1. **Buka Folder di VS Code**:
+   - Jalankan VS Code di komputer Anda.
+   - Pilih menu **File** -> **Open Folder...** (atau tekan `Ctrl + K, Ctrl + O`).
+   - Pilih folder project ini: `puskesmas-simpus-local` (atau folder hasil ekstrak).
 
-### Langkah 2: Install Dependencies
-Jalankan perintah berikut:
-```bash
-npm install
-```
-*(Tunggu hingga proses unduh dependencies selesai)*.
+2. **Buka Terminal Terintegrasi VS Code**:
+   - Tekan shortcut keyboard: `` Ctrl + ` `` (Ctrl + Backtick) atau pilih menu **Terminal** -> **New Terminal**.
 
-### Langkah 3: Jalankan Mode Development
-Jalankan perintah:
-```bash
-npm run dev
-```
+3. **Jalankan Aplikasi dari Terminal VS Code**:
+   ```bash
+   # Install dependencies (hanya saat pertama kali):
+   npm install
 
-### Langkah 4: Buka Aplikasi di Browser
-Buka browser Anda dan akses:
-👉 **`http://localhost:3000`**
+   # Jalankan server aplikasi:
+   npm run dev
+   ```
 
-Aplikasi SIMPUS Puskesmas Jurumudi Baru sudah berjalan 100% aktif di komputer lokal Anda!
+4. **Akses Aplikasi**:
+   - Klik link `http://localhost:3000` yang muncul di terminal (atau buka browser dan ketik `http://localhost:3000`).
+
+---
+
+## 🗄️ 4. Cara Menghubungkan ke Database MySQL (phpMyAdmin / XAMPP / Laragon)
+
+Aplikasi ini sudah dirancang **Dual-Mode cerdas**:
+- **Otomatis terhubung ke MySQL** jika database `puskesmas_pondokbenda` tersedia.
+- Jika MySQL belum dinyalakan, aplikasi tetap berjalan lancar menggunakan in-memory store tanpa crash.
+
+Berikut langkah mudah menghubungkan dengan file database `database.sql` yang sudah disediakan:
+
+### Langkah A: Nyalakan MySQL (XAMPP / Laragon)
+1. Buka aplikasi **XAMPP Control Panel** atau **Laragon**.
+2. Klik tombol **Start** pada modul **Apache** dan **MySQL**.
+
+### Langkah B: Impor Database `database.sql`
+1. Buka browser dan buka **phpMyAdmin**: `http://localhost/phpmyadmin`
+2. Klik tab **Import** (atau buat database baru bernama `puskesmas_pondokbenda` terlebih dahulu).
+3. Klik tombol **Choose File / Pilih File**, lalu arahkan ke file **`database.sql`** yang ada di dalam root folder project ini.
+4. Klik tombol **Go / Kirim** di bagian bawah halaman.
+5. Tunggu beberapa detik hingga muncul pesan sukses berwarna hijau: *"Import has been successfully finished"*.
+   *(Seluruh tabel `polis`, `queue_tickets`, `medical_records`, `doctors`, `surveys`, dll. sudah berhasil terbuat beserta data master lengkapnya).*
+
+### Langkah C: Konfigurasi File `.env` di VS Code
+1. Di VS Code, buat file baru di root folder bernama **`.env`** (atau salin dari `.env.example`).
+2. Tuliskan konfigurasi database Anda:
+   ```env
+   # Konfigurasi Database MySQL
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=
+   DB_NAME=puskesmas_pondokbenda
+   PORT=3000
+   ```
+   *(Catatan: Jika Anda pengguna XAMPP default di Windows, `DB_USER=root` dan `DB_PASSWORD` dikosongkan tanpa spasi).*
+
+3. Jalankan kembali aplikasi di Terminal VS Code:
+   ```bash
+   npm run dev
+   ```
+4. Perhatikan log di terminal:
+   ```text
+   [Database] Terhubung ke MySQL Database (localhost:3306/puskesmas_pondokbenda)
+   [Database] Sinkronisasi data antrean dari MySQL berhasil.
+   Puskesmas App running on http://0.0.0.0:3000
+   ```
+   Setiap ada pasien baru mendaftar atau antrean dipanggil, data akan langsung tersimpan secara otomatis dan persisten ke database MySQL Anda!
 
 ---
 

@@ -161,12 +161,51 @@ CREATE TABLE `queue_tickets` (
   `chief_complaint` TEXT DEFAULT NULL,
   `status` ENUM('Waiting','Called','Completed','Cancelled') NOT NULL DEFAULT 'Waiting',
   `estimated_time` VARCHAR(100) DEFAULT NULL,
+  `registration_number` VARCHAR(50) DEFAULT NULL,
+  `klaster_name` VARCHAR(100) DEFAULT NULL,
+  `medical_record_no` VARCHAR(50) DEFAULT NULL,
   `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_nik` (`nik`),
   KEY `idx_date_poli` (`appointment_date`, `poli_id`),
   KEY `idx_status` (`status`),
   CONSTRAINT `fk_tickets_poli` FOREIGN KEY (`poli_id`) REFERENCES `polis` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ------------------------------------------------------------
+-- 5B. TABEL REKAM MEDIS ELEKTRONIK (medical_records)
+-- ------------------------------------------------------------
+DROP TABLE IF EXISTS `medical_records`;
+CREATE TABLE `medical_records` (
+  `id` VARCHAR(50) NOT NULL,
+  `patient_name` VARCHAR(150) NOT NULL,
+  `nik` VARCHAR(20) NOT NULL,
+  `bpjs_number` VARCHAR(30) DEFAULT NULL,
+  `queue_number` VARCHAR(30) DEFAULT NULL,
+  `visit_date` DATE NOT NULL,
+  `poli_service` VARCHAR(100) NOT NULL,
+  `doctor_name` VARCHAR(150) DEFAULT NULL,
+  `gender` ENUM('L','P') DEFAULT 'L',
+  `age` INT DEFAULT 0,
+  `systolic` INT DEFAULT 120,
+  `diastolic` INT DEFAULT 80,
+  `heart_rate` INT DEFAULT 80,
+  `temperature` DECIMAL(4,1) DEFAULT 36.5,
+  `respiratory_rate` INT DEFAULT 20,
+  `subjective` TEXT DEFAULT NULL,
+  `objective` TEXT DEFAULT NULL,
+  `assessment` TEXT DEFAULT NULL,
+  `icd10_code` VARCHAR(20) DEFAULT NULL,
+  `diagnosis_name` VARCHAR(255) DEFAULT NULL,
+  `plan` TEXT DEFAULT NULL,
+  `prescriptions_json` TEXT DEFAULT NULL,
+  `status` ENUM('Menunggu','Diperiksa','Selesai') DEFAULT 'Menunggu',
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_nik_rme` (`nik`),
+  KEY `idx_visit_date` (`visit_date`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
