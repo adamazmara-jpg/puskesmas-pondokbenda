@@ -164,6 +164,7 @@ export interface VitalSigns {
 }
 
 export interface PrescriptionItem {
+  id?: string;
   medicineName: string;
   dosage: string; // e.g. "3x1 tablet sesudah makan"
   quantity: number;

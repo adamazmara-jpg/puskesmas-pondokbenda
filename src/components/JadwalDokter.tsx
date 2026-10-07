@@ -53,7 +53,7 @@ export const JadwalDokter: React.FC<JadwalDokterProps> = ({
           Jadwal & Tim Dokter Berdasarkan Klaster
         </h2>
         <p className="text-slate-600 text-xs sm:text-sm max-w-2xl mx-auto">
-          Lihat jadwal operasional praktik tenaga medis Puskesmas Pondok Benda yang terbagi ke dalam 5 Klaster ILP (Klaster 1 Manajemen s/d Klaster 4 P2M & Lintas Klaster).
+          Lihat jadwal operasional praktik tenaga medis Puskesmas Pondok Benda yang terbagi ke dalam Klaster Pelayanan (Klaster 2 Ibu & Anak, Klaster 3 Dewasa & Lansia, Klaster 4 P2M & Lintas Klaster).
         </p>
       </div>
 
@@ -61,7 +61,6 @@ export const JadwalDokter: React.FC<JadwalDokterProps> = ({
       <div className="flex flex-wrap items-center justify-center gap-2">
         {[
           { key: 'all' as const, label: 'Semua Klaster' },
-          { key: 1, label: 'Klaster 1 (Manajemen)' },
           { key: 2, label: 'Klaster 2 (Ibu & Anak)' },
           { key: 3, label: 'Klaster 3 (Dewasa & Lansia)' },
           { key: 4, label: 'Klaster 4 (P2M & TB)' },

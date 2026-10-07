@@ -66,14 +66,35 @@ export const TiketAntreanModal: React.FC<TiketAntreanModalProps> = ({
     return bDate;
   };
 
+  // Tanggal Hari Ini (YYYY-MM-DD)
+  const todayDateStr = new Date().toISOString().split('T')[0];
+  const isVisitToday = !ticket.appointmentDate || ticket.appointmentDate.split('T')[0] === todayDateStr;
+
+  // Format tanggal kunjungan (e.g. "Senin, 12 Oktober 2026")
+  const formatTanggalKunjunganStr = (dateStr?: string) => {
+    if (!dateStr) return receiptDateStr;
+    try {
+      const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString('id-ID', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const receiptDateStr = formatReceiptDate(ticket.createdAt);
+  const appointmentFormattedStr = formatTanggalKunjunganStr(ticket.appointmentDate);
   const birthDateFormatted = formatBirthDateDisplay(ticket.birthDate);
   const detailedAgeStr = ticket.ageFormatted || (ticket.birthDate ? calculateDetailedAge(ticket.birthDate) : '-');
   const doctorDisplayName = ticket.doctorName || 'dr. Ananto Adi Swasono';
   const klasterTitle = ticket.klasterName || (ticket.klasterNumber ? `KLASTER ${ticket.klasterNumber}` : 'KLASTER 3');
   const klasterSub = ticket.poliName?.toUpperCase() || 'UMUM DEWASA';
-  const regNumber = ticket.registrationNumber || '0064';
-  const familyHeadName = ticket.familyHead || '';
+  const regNumber = ticket.registrationNumber || '0001';
   const noRmStr = ticket.medicalRecordNo || (ticket.nik ? `03${ticket.nik.slice(-6)}` : '-');
   const oldRmStr = ticket.oldMedicalRecordNo || '-';
   const docRmStr = ticket.documentRmNo || '-';
@@ -83,7 +104,7 @@ export const TiketAntreanModal: React.FC<TiketAntreanModalProps> = ({
 
   const handleCopy = () => {
     navigator.clipboard.writeText(
-      `TIKET KUNJUNGAN PUSKESMAS JURUMUDI BARU\n${klasterTitle} - ${klasterSub}\nNo. Antrean: ${ticket.queueNumber}\nTanggal: ${receiptDateStr}\nNo Pendaftaran: ${regNumber}\nNIK: ${ticket.nik}\nNama: ${ticket.fullName}\nKeluhan: ${ticket.chiefComplaint || 'Pemeriksaan Kesehatan'}`
+      `TIKET KUNJUNGAN PUSKESMAS PONDOK BENDA\n${klasterTitle} - ${klasterSub}\nNo. Antrean: ${ticket.queueNumber}\nTanggal Kunjungan: ${appointmentFormattedStr}\nNo Pendaftaran: ${regNumber}\nNIK: ${ticket.nik}\nNama: ${ticket.fullName}\nKeluhan: ${ticket.chiefComplaint || 'Pemeriksaan Kesehatan'}`
     );
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -151,7 +172,7 @@ export const TiketAntreanModal: React.FC<TiketAntreanModalProps> = ({
   const handleSendWhatsApp = () => {
     const cleanPhone = (ticket.phone || '').replace(/[^0-9]/g, '');
     const formattedPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone;
-    const message = `*TIKET KUNJUNGAN PUSKESMAS JURUMUDI BARU*\n` +
+    const message = `*TIKET KUNJUNGAN PUSKESMAS PONDOK BENDA*\n` +
       `*${klasterTitle} - ${klasterSub}*\n\n` +
       `*No. Antrean : ${ticket.queueNumber}*\n` +
       `Tanggal : ${receiptDateStr}\n\n` +
@@ -159,10 +180,10 @@ export const TiketAntreanModal: React.FC<TiketAntreanModalProps> = ({
       `NIK : ${ticket.nik}\n` +
       `Nama Pasien : ${ticket.fullName}\n` +
       `Tanggal Lahir : ${birthDateFormatted}\n` +
-      (familyHeadName ? `Ayah/KK : ${familyHeadName}\n` : '') +
       `Umur : ${detailedAgeStr}\n` +
       `Keluhan : ${ticket.chiefComplaint || 'Pemeriksaan Kesehatan'}\n` +
       `Alamat : ${ticket.address}\n` +
+      `Lokasi Puskesmas : Jl. Benda Barat No.14 Perum Pamulang Permai 2, Pondok Benda, Pamulang\n` +
       `Asuransi : ${insuranceLabel}\n` +
       `Biaya : ${feeLabel}\n\n` +
       `*Petunjuk Datang Langsung:*\n` +
@@ -267,7 +288,7 @@ export const TiketAntreanModal: React.FC<TiketAntreanModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-extrabold tracking-tight">Tiket Kunjungan Pasien</h3>
-              <p className="text-[11px] text-slate-400">Puskesmas Jurumudi Baru • Format Siap Datang Langsung</p>
+              <p className="text-[11px] text-slate-400">Puskesmas Pondok Benda • Format Siap Datang Langsung</p>
             </div>
           </div>
 
@@ -307,13 +328,16 @@ export const TiketAntreanModal: React.FC<TiketAntreanModalProps> = ({
             {/* Top Puskesmas Header */}
             <div className="text-center space-y-0.5 pb-2 border-b border-dashed border-black">
               <div className="text-[10px] font-bold tracking-wider uppercase text-black">
-                PEMERINTAH KOTA TANGERANG
+                PEMERINTAH KOTA TANGERANG SELATAN
               </div>
               <h4 className="text-sm font-black tracking-wide uppercase text-black">
-                PUSKESMAS JURUMUDI BARU
+                PUSKESMAS PONDOK BENDA
               </h4>
               <p className="text-[9px] text-black">
-                Jl. Halim Perdana Kusuma No. 8 • Telp: (021) 55798821
+                Jl. Benda Barat No.14 Perum Pamulang Permai 2, Pondok Benda, Pamulang
+              </p>
+              <p className="text-[8px] text-black">
+                Kota Tangerang Selatan • Telp: (021) 74706316
               </p>
             </div>
 
@@ -333,14 +357,19 @@ export const TiketAntreanModal: React.FC<TiketAntreanModalProps> = ({
             {/* No. Antrean & Large Number */}
             <div className="text-center space-y-0.5 py-1.5 border-y-2 border-dashed border-black">
               <div className="text-[10px] font-bold uppercase tracking-wider text-black">
-                NOMOR ANTREAN
+                {isVisitToday ? 'NOMOR ANTREAN' : 'NOMOR ANTREAN ESTIMASI (BOOKING)'}
               </div>
               <div className="text-3xl sm:text-4xl font-black text-black tracking-tight my-1">
                 {ticket.queueNumber}
               </div>
               <div className="text-[11px] font-bold text-black">
-                Tanggal: {receiptDateStr}
+                {isVisitToday ? `Tanggal: ${receiptDateStr}` : `Tanggal Kunjungan: ${appointmentFormattedStr}`}
               </div>
+              {!isVisitToday && (
+                <div className="text-[9px] font-semibold text-black italic">
+                  (Daftar: {receiptDateStr})
+                </div>
+              )}
             </div>
 
             {/* Aligned Key-Value Details */}
@@ -363,19 +392,19 @@ export const TiketAntreanModal: React.FC<TiketAntreanModalProps> = ({
                 <span className="font-bold uppercase break-words">{ticket.fullName}</span>
               </div>
 
+              <div className="flex items-start">
+                <span className="w-28 shrink-0">Tgl Kunjungan</span>
+                <span className="shrink-0 mr-1">:</span>
+                <span className="font-bold uppercase break-words text-black">
+                  {appointmentFormattedStr} {!isVisitToday && '(Booking Terjadwal)'}
+                </span>
+              </div>
+
               <div className="flex">
                 <span className="w-28 shrink-0">Tanggal Lahir</span>
                 <span className="shrink-0 mr-1">:</span>
                 <span>{birthDateFormatted}</span>
               </div>
-
-              {familyHeadName ? (
-                <div className="flex">
-                  <span className="w-28 shrink-0">Ayah/KK</span>
-                  <span className="shrink-0 mr-1">:</span>
-                  <span className="uppercase">{familyHeadName}</span>
-                </div>
-              ) : null}
 
               <div className="flex">
                 <span className="w-28 shrink-0">Umur</span>
@@ -437,13 +466,32 @@ export const TiketAntreanModal: React.FC<TiketAntreanModalProps> = ({
           </div>
 
           {/* Info Card Untuk Pasien */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900 space-y-1">
-            <div className="font-bold flex items-center gap-1.5 text-amber-950">
-              <Info className="w-4 h-4 text-amber-700 shrink-0" />
-              <span>Persiapan Datang Langsung ke Puskesmas</span>
+          <div className={`border rounded-xl p-3 text-xs space-y-1 ${
+            isVisitToday
+              ? 'bg-amber-50 border-amber-200 text-amber-900'
+              : 'bg-teal-50 border-teal-200 text-teal-950'
+          }`}>
+            <div className="font-bold flex items-center gap-1.5">
+              <Info className={`w-4 h-4 shrink-0 ${isVisitToday ? 'text-amber-700' : 'text-teal-700'}`} />
+              <span>
+                {isVisitToday
+                  ? 'Kunjungan Hari Ini: Langsung Datang ke Puskesmas'
+                  : `Booking Terjadwal: Kunjungan ${appointmentFormattedStr}`}
+              </span>
             </div>
-            <p className="text-[11px] text-amber-800 leading-relaxed">
-              Cetak struk fisik via tombol <strong>Print Ticket</strong> atau simpan file PDF / WhatsApp. Saat tiba di loket Puskesmas Jurumudi Baru, cukup tunjukkan struk cetak atau e-tiket beserta KTP/BPJS asli Anda.
+            <p className={`text-[11px] leading-relaxed ${isVisitToday ? 'text-amber-800' : 'text-teal-800'}`}>
+              {isVisitToday ? (
+                <>
+                  Cetak struk fisik via tombol <strong>Print Ticket</strong> atau simpan PDF/WA. Saat tiba di loket Puskesmas, tunjukkan struk cetak atau e-tiket beserta KTP/BPJS asli Anda.
+                </>
+              ) : (
+                <>
+                  Nomor tiket estimasi Anda telah diterbitkan. <strong>Harap simpan struk tiket ini</strong> untuk dibawa saat hari kunjungan ({appointmentFormattedStr}).
+                  <span className="block mt-1 font-semibold text-teal-900 bg-teal-100/60 p-2 rounded-lg border border-teal-300">
+                    ℹ️ Catatan: Di menu <strong>'Pantau Status Antrean Berjalan Saat Ini'</strong>, nama Anda <strong>TIDAK MUNCUL HARI INI</strong> karena antrean berjalan hanya untuk kunjungan hari ini. Nama Anda baru akan aktif otomatis di antrean berjalan saat hari tanggal booking Anda tiba ({appointmentFormattedStr}).
+                  </span>
+                </>
+              )}
             </p>
           </div>
 
@@ -503,7 +551,11 @@ export const TiketAntreanModal: React.FC<TiketAntreanModalProps> = ({
             className="w-full py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-300 transition flex items-center justify-center gap-2 group"
           >
             <Activity className="w-4 h-4 text-emerald-600 animate-pulse" />
-            <span>Pantau Status Antrean Berjalan Saat Ini</span>
+            <span>
+              {isVisitToday
+                ? 'Pantau Status Antrean Berjalan Saat Ini'
+                : 'Cek Informasi Layanan & Antrean Puskesmas'}
+            </span>
             <ArrowRight className="w-4 h-4 text-emerald-600 group-hover:translate-x-1 transition-transform" />
           </button>
 

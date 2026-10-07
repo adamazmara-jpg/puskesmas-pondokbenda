@@ -92,6 +92,7 @@ export interface SheetRowItem {
   timestampApotek: string; // Timestamp_Apotek
   statusBpu: string; // Status BPU
   timestampLab: string; // Timestamp_Lab
+  doctorName?: string; // Dokter Pemeriksa yang dipilih loket
   queueNumber?: string;
   id?: string;
 }
@@ -149,7 +150,8 @@ export function convertTicketToSheetRow(ticket: QueueTicket): SheetRowItem {
     timestampBpu: timestampBpu || '',
     timestampApotek: timestampApotek || '',
     statusBpu: statusBpu || (ticket.status === 'Completed' ? 'Selesai' : ticket.status === 'Called' ? 'Sedang Dilayani' : 'Menunggu'),
-    timestampLab: timestampLab || ''
+    timestampLab: timestampLab || '',
+    doctorName: ticket.doctorName || ''
   };
 }
 
@@ -169,6 +171,7 @@ export function exportExactGoogleSheetToExcel(tickets: QueueTicket[], customFile
       'Alamat': row.alamat,
       'Hadir': row.hadir ? 'TRUE' : 'FALSE',
       'Timestamp_Loket': row.timestampLoket,
+      'Dokter_Pemeriksa': row.doctorName || '-',
       'Timestamp_BPU': row.timestampBpu || '',
       'Timestamp_Apotek': row.timestampApotek || '',
       'Status BPU': row.statusBpu || '',

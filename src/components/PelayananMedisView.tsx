@@ -67,34 +67,6 @@ export interface KlasterMeta {
 
 export const KLASTER_CONFIGS: KlasterMeta[] = [
   {
-    number: 1,
-    name: 'Klaster 1: Manajemen & Tata Kelola',
-    shortName: 'Klaster 1 (Manajemen)',
-    category: 'Manajemen & Rujukan',
-    badge: 'Klaster 1',
-    tagline: 'Ketatausahaan, Manajemen Mutu, Rujukan & Rekam Medis',
-    description: 'Pelayanan administrasi kesehatan, rujukan antar fasilitas faskes, serta manajemen tata kelola mutu pelayanan Puskesmas.',
-    color: 'blue',
-    bgBadge: 'bg-blue-100 text-blue-900 border-blue-300',
-    borderBadge: 'border-blue-300',
-    bgGradient: 'from-blue-700 to-indigo-800',
-    activeBorder: 'border-blue-600 ring-2 ring-blue-500/20',
-    lightBg: 'bg-blue-50/70 border-blue-200',
-    avatarBg: 'bg-blue-50 border-blue-200 text-blue-700',
-    avatarIconColor: 'text-blue-600',
-    commonDiagnoses: [
-      { code: 'Z00.0', name: 'Pemeriksaan Kesehatan Umum / Medical Check Up' },
-      { code: 'Z02.1', name: 'Pemeriksaan Kesehatan untuk Persyaratan Kerja / Sekolah' },
-      { code: 'Z01.0', name: 'Pemeriksaan Kelayakan Rujukan Faskes Lanjutan' },
-      { code: 'Z76.0', name: 'Penerbitan Surat Keterangan Dokter / Konsultasi Sehat' }
-    ],
-    commonMedicines: [
-      { medicineName: 'Multivitamin B Kompleks', dosage: '1 x 1 tablet sesudah makan', quantity: 15, notes: 'Meningkatkan stamina' },
-      { medicineName: 'Vitamin C 500 mg Tablet', dosage: '1 x 1 tablet sesudah makan', quantity: 15, notes: 'Daya tahan tubuh' },
-      { medicineName: 'Paracetamol 500 mg Tablet', dosage: '3 x 1 tablet (bila demam/pusing)', quantity: 10, notes: 'Sesudah makan' }
-    ]
-  },
-  {
     number: 2,
     name: 'Klaster 2: Ibu, Anak, dan Remaja',
     shortName: 'Klaster 2 (Ibu & Anak)',
@@ -225,6 +197,51 @@ export const KLASTER_CONFIGS: KlasterMeta[] = [
   }
 ];
 
+// Daftar Formularium Obat Standar Puskesmas Pondok Benda (Sesuai Formularium Nasional / Fornas Puskesmas)
+export const FORMULARIUM_OBAT_PUSKESMAS = [
+  // Klaster 3: Umum / Dewasa / Lansia
+  { name: 'Paracetamol 500 mg Tablet', category: 'Analgesik & Antipiretik', defaultDosage: '3 x 1 tablet sesudah makan (bila demam/nyeri)', defaultQty: 10, defaultNotes: 'Sesudah makan, bila perlu' },
+  { name: 'Amoxicillin 500 mg Kaplet', category: 'Antibiotik', defaultDosage: '3 x 1 kaplet sesudah makan (habiskan 5 hari)', defaultQty: 15, defaultNotes: 'Antibiotik, harus dihabiskan' },
+  { name: 'Vitamin B Kompleks Tablet', category: 'Vitamin & Suplemen', defaultDosage: '1 x 1 tablet sesudah makan pagi', defaultQty: 10, defaultNotes: 'Untuk daya tahan & saraf' },
+  { name: 'Antasida DOEN 200 mg Tablet Kunyah', category: 'Lambung / Antasida', defaultDosage: '3 x 1 tablet dikunyah 1 jam sebelum makan', defaultQty: 10, defaultNotes: 'Kunyah sebelum makan' },
+  { name: 'Omeprazole 20 mg Kapsul', category: 'Lambung / PPI', defaultDosage: '2 x 1 kapsul 30 menit sebelum makan', defaultQty: 10, defaultNotes: 'Sebelum makan' },
+  { name: 'Amlodipine 5 mg Tablet', category: 'Antihipertensi', defaultDosage: '1 x 1 tablet malam hari secara teratur', defaultQty: 30, defaultNotes: 'Rutin kontrol tensi' },
+  { name: 'Amlodipine 10 mg Tablet', category: 'Antihipertensi', defaultDosage: '1 x 1 tablet malam hari secara teratur', defaultQty: 30, defaultNotes: 'Rutin kontrol tensi' },
+  { name: 'Captopril 25 mg Tablet', category: 'Antihipertensi', defaultDosage: '2 x 1 tablet 1 jam sebelum makan', defaultQty: 20, defaultNotes: 'Sebelum makan' },
+  { name: 'Metformin 500 mg Tablet', category: 'Antidiabetes Oral', defaultDosage: '2 x 1 tablet bersama/sesudah makan', defaultQty: 30, defaultNotes: 'Bersama makan' },
+  { name: 'Glimepiride 2 mg Tablet', category: 'Antidiabetes Oral', defaultDosage: '1 x 1 tablet sebelum makan pagi', defaultQty: 30, defaultNotes: 'Sebelum sarapan' },
+  { name: 'Simvastatin 10 mg Tablet', category: 'Antikolesterol', defaultDosage: '1 x 1 tablet malam sebelum tidur', defaultQty: 30, defaultNotes: 'Malam hari' },
+  { name: 'Allopurinol 100 mg Tablet', category: 'Asam Urat', defaultDosage: '1 x 1 tablet sesudah makan', defaultQty: 15, defaultNotes: 'Sesudah makan' },
+  { name: 'Natrium Diklofenak 50 mg Tablet', category: 'Antiinflamasi / Nyeri', defaultDosage: '2 x 1 tablet sesudah makan bila nyeri', defaultQty: 10, defaultNotes: 'Sesudah makan' },
+  { name: 'Dexamethasone 0.5 mg Tablet', category: 'Kortikosteroid', defaultDosage: '3 x 1 tablet sesudah makan', defaultQty: 10, defaultNotes: 'Sesudah makan' },
+  { name: 'Cetirizine 10 mg Tablet', category: 'Antihistamin / Alergi', defaultDosage: '1 x 1 tablet malam hari', defaultQty: 10, defaultNotes: 'Bila gatal / alergi' },
+  { name: 'CTM 4 mg Tablet', category: 'Antihistamin', defaultDosage: '3 x 1 tablet sesudah makan', defaultQty: 10, defaultNotes: 'Dapat menyebabkan kantuk' },
+  { name: 'Ambroxol 30 mg Tablet', category: 'Mukolitik / Pengencer Dahak', defaultDosage: '3 x 1 tablet sesudah makan', defaultQty: 10, defaultNotes: 'Banyak minum air hangat' },
+  { name: 'GG (Glyceryl Guaiacolate) 100 mg Tablet', category: 'Ekspektoran Batuk', defaultDosage: '3 x 1 tablet sesudah makan', defaultQty: 10, defaultNotes: 'Sesudah makan' },
+
+  // Klaster 2: KIA, Anak & Balita
+  { name: 'Paracetamol Sirup 120 mg/5ml (Botol)', category: 'Sirup Anak', defaultDosage: '3 x 1 sendok takar (5ml) bila demam', defaultQty: 1, defaultNotes: 'Kocok dahulu sebelum diminum' },
+  { name: 'Amoxicillin Sirup Kering 125 mg/5ml', category: 'Antibiotik Sirup', defaultDosage: '3 x 1 sendok takar (5ml) selama 5 hari', defaultQty: 1, defaultNotes: 'Habiskan, simpan di tempat sejuk' },
+  { name: 'Oralit Sachet 200 ml', category: 'Rehidrasi / Diare', defaultDosage: '1 sachet dilarutkan dalam 200ml air tiap BAB cair', defaultQty: 5, defaultNotes: 'Minum sedikit demi sedikit' },
+  { name: 'Zinc Sirup 20 mg/5ml (Botol)', category: 'Suplemen Diare Anak', defaultDosage: '1 x 1 sendok takar (5ml) selama 10 hari', defaultQty: 1, defaultNotes: 'Wajib habiskan 10 hari' },
+  { name: 'Tablet Tambah Darah (Fe + Asam Folat)', category: 'Ibu Hamil', defaultDosage: '1 x 1 tablet malam sebelum tidur', defaultQty: 30, defaultNotes: 'Minum dengan air putih hangat' },
+  { name: 'Kalsium Laktat (Kalk) 500 mg Tablet', category: 'Kalsium Ibu Hamil', defaultDosage: '1 x 1 tablet sesudah makan pagi', defaultQty: 30, defaultNotes: 'Sesudah sarapan' },
+  { name: 'Vitamin A Biru 100.000 IU Kapsul', category: 'Vitamin Bayi (6-11 bln)', defaultDosage: '1 x 1 kapsul teteskan ke mulut', defaultQty: 1, defaultNotes: 'Program Vitamin A Kemenkes' },
+  { name: 'Vitamin A Merah 200.000 IU Kapsul', category: 'Vitamin Balita (12-59 bln)', defaultDosage: '1 x 1 kapsul teteskan ke mulut', defaultQty: 1, defaultNotes: 'Program Vitamin A Kemenkes' },
+
+  // Klaster 4: P2M, ISPA & TB Paru
+  { name: 'Paket OAT Kategori 1 (FDC Dewasa)', category: 'Obat TB Paru', defaultDosage: '1 x 4 tablet pagi hari saat perut kosong', defaultQty: 28, defaultNotes: 'Program TB Nasional (Gratis)' },
+  { name: 'Vitamin C 500 mg Tablet', category: 'Antioksidan / Daya Tahan', defaultDosage: '1 x 1 tablet sesudah makan pagi', defaultQty: 15, defaultNotes: 'Sesudah makan' },
+  { name: 'Kotrimoksazol 480 mg Tablet', category: 'Antibiotik Infeksi', defaultDosage: '2 x 1 tablet sesudah makan', defaultQty: 10, defaultNotes: 'Sesudah makan' },
+
+  // Lintas Klaster: Gigi & Mulut, UGD
+  { name: 'Asam Mefenamat 500 mg Kaplet', category: 'Pereda Sakit Gigi/Nyeri', defaultDosage: '3 x 1 kaplet sesudah makan bila nyeri', defaultQty: 10, defaultNotes: 'Bila nyeri berdenyut' },
+  { name: 'Clindamycin 300 mg Kapsul', category: 'Antibiotik Gigi', defaultDosage: '3 x 1 kapsul sesudah makan', defaultQty: 12, defaultNotes: 'Antibiotik infeksi gusi' },
+  { name: 'Obat Kumur Povidone Iodine 1% (Botol)', category: 'Antiseptik Mulut', defaultDosage: '2 x sehari untuk kumur selama 30 detik', defaultQty: 1, defaultNotes: 'Jangan ditelan' },
+  { name: 'Salep Kulit Hidrokortison 2.5% (Tube)', category: 'Salep Luar', defaultDosage: 'Oleskan 2 x sehari pada area gatal/kemerahan', defaultQty: 1, defaultNotes: 'Obat luar' },
+  { name: 'Salep Luka Bacitracin / Gentamicin (Tube)', category: 'Salep Luka Luar', defaultDosage: 'Oleskan tipis 2 x sehari setelah luka dibersihkan', defaultQty: 1, defaultNotes: 'Obat luar' }
+];
+
 const DOSAGE_PRESETS = [
   '3 x 1 tablet sesudah makan (3x sehari)',
   '2 x 1 tablet sesudah makan (2x sehari)',
@@ -250,19 +267,19 @@ export function getTicketKlasterNumber(ticket: QueueTicket): number {
   const poliName = (ticket.poliName || '').toLowerCase();
   const docName = (ticket.doctorName || '').toLowerCase();
 
-  if (poli.includes('gigi') || poliName.includes('gigi') || poliName.includes('ugd') || docName.includes('maya rosdiana') || docName.includes('farhan') || docName.includes('dimas')) {
+  if (poli.includes('gigi') || poliName.includes('gigi') || poliName.includes('ugd') || docName.includes('hanna') || docName.includes('otti') || docName.includes('eka purnamasari') || docName.includes('maya rosdiana') || docName.includes('farhan') || docName.includes('dimas')) {
     return 5;
   }
-  if (poli.includes('tb') || poli.includes('ispa') || poliName.includes('tb') || poliName.includes('batuk') || docName.includes('rian') || docName.includes('hendra')) {
+  if (poli.includes('tb') || poli.includes('ispa') || poliName.includes('tb') || poliName.includes('batuk')) {
     return 4;
   }
-  if (poli.includes('kia') || poli.includes('anak') || poliName.includes('kia') || poliName.includes('anak') || poliName.includes('imunisasi') || docName.includes('nining') || docName.includes('siska')) {
+  if (poli.includes('kia') || poli.includes('anak') || poli.includes('bayi') || poliName.includes('kia') || poliName.includes('anak') || poliName.includes('bayi') || poliName.includes('imunisasi') || docName.includes('fitri') || docName.includes('annissa') || docName.includes('dea') || docName.includes('milda') || docName.includes('mela') || docName.includes('priska') || docName.includes('wiji') || docName.includes('salwa') || docName.includes('nining') || docName.includes('siska')) {
     return 2;
   }
   if (docName.includes('bambang') && poliName.includes('manajemen') || docName.includes('rina handayani')) {
     return 1;
   }
-  // Default to Klaster 3 Dewasa & Lansia
+  // Default to Klaster 3 Dewasa & Lansia (dr. Noftu, dr. Putri, dr. Rahma Damayanti, Meirizka, Kholifah, Yulianti)
   return 3;
 }
 
@@ -277,13 +294,13 @@ export function getDoctorKlasterNumber(doc: DoctorSchedule): number {
   const poliName = (doc.poliName || '').toLowerCase();
   const docName = (doc.doctorName || '').toLowerCase();
 
-  if (poli.includes('gigi') || poliName.includes('gigi') || poliName.includes('ugd') || docName.includes('maya rosdiana') || docName.includes('farhan') || docName.includes('dimas')) {
+  if (poli.includes('gigi') || poliName.includes('gigi') || poliName.includes('ugd') || docName.includes('hanna') || docName.includes('otti') || docName.includes('eka purnamasari') || docName.includes('maya rosdiana') || docName.includes('farhan') || docName.includes('dimas')) {
     return 5;
   }
-  if (poli.includes('tb') || poli.includes('ispa') || poliName.includes('tb') || poliName.includes('batuk') || docName.includes('rian') || docName.includes('hendra')) {
+  if (poli.includes('tb') || poli.includes('ispa') || poliName.includes('tb') || poliName.includes('batuk')) {
     return 4;
   }
-  if (poli.includes('kia') || poli.includes('anak') || poliName.includes('kia') || poliName.includes('anak') || docName.includes('nining') || docName.includes('siska')) {
+  if (poli.includes('kia') || poli.includes('anak') || poli.includes('bayi') || poliName.includes('kia') || poliName.includes('anak') || poliName.includes('bayi') || poliName.includes('imunisasi') || docName.includes('fitri') || docName.includes('annissa') || docName.includes('dea') || docName.includes('milda') || docName.includes('mela') || docName.includes('priska') || docName.includes('wiji') || docName.includes('salwa') || docName.includes('nining') || docName.includes('siska')) {
     return 2;
   }
   if (docName.includes('rina handayani') || docName.includes('tata kelola') || (docName.includes('bambang') && poliName.includes('manajemen'))) {
@@ -511,20 +528,80 @@ export const PelayananMedisView: React.FC<PelayananMedisViewProps> = ({
     const docToUse = assignedDoc || activeDoctor;
 
     setActivePatient(ticket);
-    setChiefComplaint(ticket.chiefComplaint || 'Pemeriksaan rutin kesehatan');
+    const complaint = ticket.chiefComplaint || 'Pemeriksaan rutin kesehatan';
+    setChiefComplaint(complaint);
 
-    // Reset diagnosis and prescriptions so doctor fills them manually according to patient's clinical needs
-    setDiagnosisCode('');
-    setDiagnosisName('');
-    setPrescriptions([
-      {
-        id: `rx-${Date.now()}`,
-        medicineName: '',
-        dosage: '3 x 1 tablet sesudah makan',
-        quantity: 10,
-        notes: ''
+    const ticketKlaster = getTicketKlasterNumber(ticket);
+
+    // Initial 2 - 3 obat awal disesuaikan dengan keluhan dan klaster pasien
+    let initialPrescriptions: PrescriptionItem[] = [];
+
+    if (ticketKlaster === 2) {
+      // Klaster 2: Ibu & Anak
+      const isBalita = (ticket.birthDate && new Date().getFullYear() - new Date(ticket.birthDate).getFullYear() < 12) || ticket.poliId?.includes('anak');
+      if (isBalita) {
+        initialPrescriptions = [
+          { id: `rx-${Date.now()}-1`, medicineName: 'Paracetamol Sirup 120 mg/5ml (Botol)', dosage: '3 x 1 sendok takar (5ml) bila demam', quantity: 1, notes: 'Kocok dahulu, bila demam/rewel' },
+          { id: `rx-${Date.now()}-2`, medicineName: 'Amoxicillin Sirup Kering 125 mg/5ml', dosage: '3 x 1 sendok takar (5ml) sesudah makan', quantity: 1, notes: 'Habiskan selama 5 hari' }
+        ];
+      } else {
+        // Ibu Hamil / KB
+        initialPrescriptions = [
+          { id: `rx-${Date.now()}-1`, medicineName: 'Tablet Tambah Darah (Fe + Asam Folat)', dosage: '1 x 1 tablet malam sebelum tidur', quantity: 30, notes: 'Diminum dengan air putih hangat' },
+          { id: `rx-${Date.now()}-2`, medicineName: 'Kalsium Laktat (Kalk) 500 mg Tablet', dosage: '1 x 1 tablet sesudah makan pagi', quantity: 30, notes: 'Suplemen kalsium ibu hamil' },
+          { id: `rx-${Date.now()}-3`, medicineName: 'Vitamin C 500 mg Tablet', dosage: '1 x 1 tablet sesudah makan pagi', quantity: 15, notes: 'Menjaga daya tahan tubuh' }
+        ];
       }
-    ]);
+    } else if (ticketKlaster === 4) {
+      // Klaster 4: Batuk / TB / ISPA
+      initialPrescriptions = [
+        { id: `rx-${Date.now()}-1`, medicineName: 'Ambroxol 30 mg Tablet', dosage: '3 x 1 tablet sesudah makan', quantity: 15, notes: 'Pengencer dahak' },
+        { id: `rx-${Date.now()}-2`, medicineName: 'Paracetamol 500 mg Tablet', dosage: '3 x 1 tablet sesudah makan bila nyeri/demam', quantity: 10, notes: 'Sesudah makan' },
+        { id: `rx-${Date.now()}-3`, medicineName: 'Vitamin C 500 mg Tablet', dosage: '1 x 1 tablet sesudah makan', quantity: 15, notes: 'Daya tahan tubuh' }
+      ];
+    } else if (ticketKlaster === 5) {
+      // Lintas Klaster: Gigi / UGD
+      initialPrescriptions = [
+        { id: `rx-${Date.now()}-1`, medicineName: 'Asam Mefenamat 500 mg Kaplet', dosage: '3 x 1 kaplet sesudah makan bila nyeri', quantity: 10, notes: 'Pereda nyeri berdenyut' },
+        { id: `rx-${Date.now()}-2`, medicineName: 'Amoxicillin 500 mg Kaplet', dosage: '3 x 1 kaplet sesudah makan (habiskan 5 hari)', quantity: 15, notes: 'Antibiotik, harus dihabiskan' },
+        { id: `rx-${Date.now()}-3`, medicineName: 'Obat Kumur Povidone Iodine 1% (Botol)', dosage: '2 x sehari untuk kumur selama 30 detik', quantity: 1, notes: 'Antiseptik rongga mulut' }
+      ];
+    } else {
+      // Klaster 3 (Default): Dewasa & Lansia (2 - 3 Obat Standar Puskesmas)
+      const cLower = complaint.toLowerCase();
+      if (cLower.includes('lambung') || cLower.includes('maag') || cLower.includes('perut')) {
+        initialPrescriptions = [
+          { id: `rx-${Date.now()}-1`, medicineName: 'Antasida DOEN 200 mg Tablet Kunyah', dosage: '3 x 1 tablet dikunyah 1 jam sebelum makan', quantity: 15, notes: 'Kunyah sebelum makan' },
+          { id: `rx-${Date.now()}-2`, medicineName: 'Omeprazole 20 mg Kapsul', dosage: '2 x 1 kapsul 30 menit sebelum makan', quantity: 10, notes: 'Sebelum makan' },
+          { id: `rx-${Date.now()}-3`, medicineName: 'Paracetamol 500 mg Tablet', dosage: '3 x 1 tablet bila nyeri perut/badan meriang', quantity: 10, notes: 'Bila perlu' }
+        ];
+      } else if (cLower.includes('tensi') || cLower.includes('hipertensi') || cLower.includes('pusing')) {
+        initialPrescriptions = [
+          { id: `rx-${Date.now()}-1`, medicineName: 'Amlodipine 5 mg Tablet', dosage: '1 x 1 tablet malam hari secara teratur', quantity: 30, notes: 'Rutin kontrol tensi' },
+          { id: `rx-${Date.now()}-2`, medicineName: 'Paracetamol 500 mg Tablet', dosage: '3 x 1 tablet sesudah makan bila nyeri kepala', quantity: 10, notes: 'Bila sakit kepala' },
+          { id: `rx-${Date.now()}-3`, medicineName: 'Vitamin B Kompleks Tablet', dosage: '1 x 1 tablet sesudah makan pagi', quantity: 15, notes: 'Kebugaran saraf' }
+        ];
+      } else {
+        // Standar Umum 3 Obat Awal (Paracetamol + Amoxicillin + Vitamin B Kompleks)
+        initialPrescriptions = [
+          { id: `rx-${Date.now()}-1`, medicineName: 'Paracetamol 500 mg Tablet', dosage: '3 x 1 tablet sesudah makan bila demam/nyeri', quantity: 10, notes: 'Sesudah makan' },
+          { id: `rx-${Date.now()}-2`, medicineName: 'Amoxicillin 500 mg Kaplet', dosage: '3 x 1 kaplet sesudah makan (habiskan 5 hari)', quantity: 15, notes: 'Antibiotik, harus dihabiskan' },
+          { id: `rx-${Date.now()}-3`, medicineName: 'Vitamin B Kompleks Tablet', dosage: '1 x 1 tablet sesudah makan pagi', quantity: 10, notes: 'Daya tahan tubuh & saraf' }
+        ];
+      }
+    }
+
+    setDiagnosisCode(ticketKlaster === 2 ? 'Z34.9' : ticketKlaster === 4 ? 'J06.9' : ticketKlaster === 5 ? 'K04.0' : 'I10');
+    setDiagnosisName(
+      ticketKlaster === 2
+        ? 'Pemeriksaan Kesehatan Ibu & Anak'
+        : ticketKlaster === 4
+        ? 'Infeksi Saluran Pernapasan Akut (ISPA)'
+        : ticketKlaster === 5
+        ? 'Pulpitis / Gangguan Kesehatan Gigi'
+        : 'Pemeriksaan Kesehatan Dewasa / Hipertensi'
+    );
+    setPrescriptions(initialPrescriptions);
 
     speakDoctorCall(ticket, docToUse);
     onUpdateTicketStatus(ticket.id, 'Called');
@@ -654,7 +731,7 @@ export const PelayananMedisView: React.FC<PelayananMedisViewProps> = ({
               Pemeriksaan Dokter Sesuai Klaster & Tim Medis
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 max-w-3xl leading-relaxed">
-              Masing-masing dokter dapat memilih klasternya (Klaster 1 s/d Klaster 4 & Lintas Klaster) atau profil dokter aktif untuk memfilter pasien yang berkunjung secara akurat, melakukan pemeriksaan klinis SOAP, dan menerbitkan e-resep ke farmasi.
+              Masing-masing dokter dapat memilih klasternya (Klaster 2 s/d Klaster 4 & Lintas Klaster) atau profil dokter aktif untuk memfilter pasien yang berkunjung secara akurat, melakukan pemeriksaan klinis SOAP, dan menerbitkan e-resep ke farmasi.
             </p>
           </div>
 
@@ -706,7 +783,7 @@ export const PelayananMedisView: React.FC<PelayananMedisViewProps> = ({
               </span>
             </button>
 
-            {/* Klaster 1 - 5 */}
+            {/* Klaster 2 - 5 */}
             {KLASTER_CONFIGS.map((k) => {
               const isSelected = selectedKlasterNumber === k.number;
               const countObj = klasterCounts[k.number] || { total: 0, waiting: 0 };
@@ -1268,37 +1345,80 @@ export const PelayananMedisView: React.FC<PelayananMedisViewProps> = ({
               {/* Section 3: Kebutuhan Obat-obatan (e-Resep Dokter) */}
               <div className="space-y-3 pt-3 border-t border-slate-200">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-xs font-black text-slate-800 uppercase tracking-wider">
-                    <Pill className="w-4 h-4 text-emerald-600" />
-                    <span>3. Kebutuhan Obat-Obatan Pasien (e-Resep Dokter)</span>
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-black text-slate-800 uppercase tracking-wider">
+                      <Pill className="w-4 h-4 text-emerald-600" />
+                      <span>3. Kebutuhan Obat-Obatan Pasien (e-Resep Dokter)</span>
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold">
+                        {prescriptions.length} Obat Siap Diberikan
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Awalnya disiapkan 2 - 3 obat standar sesuai keluhan pasien. Anda dapat menambah, mengubah, atau menghapus obat sesuai resep dokter.
+                    </p>
                   </div>
 
-                  <button
-                    onClick={handleAddPrescriptionRow}
-                    className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>+ Tambah Baris Obat</span>
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={handleAddPrescriptionRow}
+                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Tambah Obat Bebas</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Add Pill from Formularium Puskesmas */}
+                <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                    <span>⚡ Pilih Cepat Obat Tambahan dari Formularium Puskesmas:</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Klik untuk langsung menambahkan ke resep</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                    {FORMULARIUM_OBAT_PUSKESMAS.slice(0, 16).map((med, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setPrescriptions(prev => [
+                            ...prev,
+                            {
+                              id: `rx-${Date.now()}-${prev.length}`,
+                              medicineName: med.name,
+                              dosage: med.defaultDosage,
+                              quantity: med.defaultQty,
+                              notes: med.defaultNotes
+                            }
+                          ]);
+                        }}
+                        className="text-[10.5px] px-2.5 py-1 bg-white hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 rounded-lg border border-slate-300 hover:border-emerald-300 transition font-medium flex items-center gap-1 shadow-2xs"
+                        title={`Tambah ${med.name} (${med.category})`}
+                      >
+                        <Plus className="w-2.5 h-2.5 text-emerald-600" />
+                        <span>{med.name}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Prescription List Table */}
-                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-100 text-slate-700 font-bold uppercase text-[10px]">
                       <tr>
-                        <th className="p-2.5">Nama Obat & Sediaan (Ketik Kebutuhan Pasien)</th>
-                        <th className="p-2.5">Aturan Pakai</th>
-                        <th className="p-2.5 w-20 text-center">Jumlah</th>
-                        <th className="p-2.5">Catatan</th>
-                        <th className="p-2.5 w-12 text-center">Hapus</th>
+                        <th className="p-2.5 w-5/12">Nama Obat & Sediaan (Ketik / Pilih Obat)</th>
+                        <th className="p-2.5 w-4/12">Aturan Pakai</th>
+                        <th className="p-2.5 w-16 text-center">Jumlah</th>
+                        <th className="p-2.5">Catatan Khusus</th>
+                        <th className="p-2.5 w-12 text-center">Aksi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {prescriptions.length === 0 && (
                         <tr>
                           <td colSpan={5} className="p-6 text-center text-slate-400 text-xs bg-slate-50/50">
-                            Belum ada obat yang ditambahkan. Klik <strong className="text-emerald-700">+ Tambah Obat</strong> jika pasien memerlukan resep obat, atau lanjutkan tanpa resep.
+                            Belum ada obat yang ditambahkan. Klik <strong className="text-emerald-700">+ Tambah Obat Bebas</strong> atau pilih cepat dari tombol di atas.
                           </td>
                         </tr>
                       )}
@@ -1307,9 +1427,20 @@ export const PelayananMedisView: React.FC<PelayananMedisViewProps> = ({
                           <td className="p-2">
                             <input
                               type="text"
+                              list="puskesmas-drug-list"
                               value={item.medicineName || ''}
-                              onChange={(e) => handlePrescriptionChange(idx, 'medicineName', e.target.value)}
-                              placeholder="Ketik nama obat & dosis..."
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handlePrescriptionChange(idx, 'medicineName', val);
+                                // Auto-fill dosage & quantity if matched standard formulary
+                                const matched = FORMULARIUM_OBAT_PUSKESMAS.find(f => f.name.toLowerCase() === val.toLowerCase());
+                                if (matched) {
+                                  handlePrescriptionChange(idx, 'dosage', matched.defaultDosage);
+                                  handlePrescriptionChange(idx, 'quantity', matched.defaultQty);
+                                  handlePrescriptionChange(idx, 'notes', matched.defaultNotes);
+                                }
+                              }}
+                              placeholder="Ketik atau pilih nama obat..."
                               className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg font-bold text-xs text-slate-900 placeholder:font-normal placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                             />
                           </td>
@@ -1351,7 +1482,7 @@ export const PelayananMedisView: React.FC<PelayananMedisViewProps> = ({
                               type="button"
                               onClick={() => handleRemovePrescriptionRow(idx)}
                               className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
-                              title="Hapus baris obat"
+                              title="Hapus obat ini"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1360,6 +1491,13 @@ export const PelayananMedisView: React.FC<PelayananMedisViewProps> = ({
                       ))}
                     </tbody>
                   </table>
+
+                  {/* Datalist for all puskesmas medicines */}
+                  <datalist id="puskesmas-drug-list">
+                    {FORMULARIUM_OBAT_PUSKESMAS.map((f, i) => (
+                      <option key={i} value={f.name}>{`${f.category} - ${f.defaultDosage}`}</option>
+                    ))}
+                  </datalist>
                 </div>
               </div>
 

@@ -18,6 +18,7 @@ import {
   FileText
 } from 'lucide-react';
 import { QueueTicket, QueueStatus } from '../types';
+import { INITIAL_DOCTORS } from '../data/mockData';
 import {
   convertTicketToSheetRow,
   exportExactGoogleSheetToExcel,
@@ -121,6 +122,7 @@ export const SpreadsheetPasienRekap: React.FC<SpreadsheetPasienRekapProps> = ({
       'Tanggal_Lahir',
       'Alamat',
       'Hadir',
+      'Dokter_Pemeriksa',
       'Timestamp_Loket',
       'Timestamp_BPU',
       'Timestamp_Apotek',
@@ -139,6 +141,7 @@ export const SpreadsheetPasienRekap: React.FC<SpreadsheetPasienRekapProps> = ({
         r.tanggalLahir,
         r.alamat,
         r.hadir ? 'TRUE' : 'FALSE',
+        r.doctorName || '-',
         r.timestampLoket,
         r.timestampBpu,
         r.timestampApotek,
@@ -309,6 +312,12 @@ export const SpreadsheetPasienRekap: React.FC<SpreadsheetPasienRekapProps> = ({
                     <ArrowUpDown className="w-3 h-3 text-slate-700 opacity-60" />
                   </div>
                 </th>
+                <th className="bg-[#FFFF00] text-black px-3 py-2.5 border-r border-slate-300 whitespace-nowrap min-w-[170px]">
+                  <div className="flex items-center gap-1">
+                    <span>Dokter_Pemeriksa</span>
+                    <ArrowUpDown className="w-3 h-3 text-slate-700 opacity-60" />
+                  </div>
+                </th>
                 <th className="bg-[#FFFF00] text-black px-3 py-2.5 border-r border-slate-400 whitespace-nowrap">
                   <div className="flex items-center gap-1">
                     <span>Timestamp_Loket</span>
@@ -347,7 +356,7 @@ export const SpreadsheetPasienRekap: React.FC<SpreadsheetPasienRekapProps> = ({
             <tbody className="divide-y divide-slate-200 font-normal text-slate-900">
               {filteredRows.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="p-8 text-center text-slate-400 bg-slate-50">
+                  <td colSpan={15} className="p-8 text-center text-slate-400 bg-slate-50">
                     <FileSpreadsheet className="w-8 h-8 mx-auto mb-2 text-slate-300" />
                     <p className="font-bold text-slate-600">Belum ada data pendaftaran pasien</p>
                     <p className="text-xs">Pasien yang mendaftar online atau di loket akan langsung muncul di baris tabel ini.</p>
@@ -419,6 +428,45 @@ export const SpreadsheetPasienRekap: React.FC<SpreadsheetPasienRekapProps> = ({
                             <div className="w-4 h-4 border-2 border-slate-400 rounded bg-white" />
                           )}
                         </button>
+                      </td>
+
+                      {/* Dokter_Pemeriksa (Dokter Pilihan Loket - Hanya dokter dari klaster terkait) */}
+                      <td className="px-3 py-2 text-slate-800 font-semibold whitespace-nowrap border-r border-slate-200">
+                        {(() => {
+                          const matchedTicket = tickets.find(t => t.id === row.id);
+                          const klasterNum = matchedTicket?.klasterNumber || (
+                            row.pilihPoli.toLowerCase().includes('kia') || row.pilihPoli.toLowerCase().includes('anak') || row.pilihPoli.toLowerCase().includes('ibu') ? 2 :
+                            row.pilihPoli.toLowerCase().includes('gigi') || row.pilihPoli.toLowerCase().includes('tb') || row.pilihPoli.toLowerCase().includes('ispa') ? 4 : 3
+                          );
+
+                          const klasterDoctors = INITIAL_DOCTORS.filter(d => {
+                            if (klasterNum === 2) return d.klasterNumber === 2;
+                            if (klasterNum === 3) return d.klasterNumber === 3;
+                            if (klasterNum === 4) return d.klasterNumber === 4 || d.klasterNumber === 5;
+                            return d.klasterNumber === klasterNum;
+                          });
+
+                          return (
+                            <select
+                              value={row.doctorName || ''}
+                              onChange={(e) => {
+                                const newDoc = e.target.value;
+                                if (onUpdateTicketField && row.id) {
+                                  onUpdateTicketField(row.id, { doctorName: newDoc });
+                                }
+                              }}
+                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-300 rounded text-xs font-bold text-emerald-950 focus:outline-none focus:ring-1 focus:ring-emerald-600 cursor-pointer"
+                              title={`Pilih dokter jaga khusus Klaster ${klasterNum}`}
+                            >
+                              <option value="">-- Klaster {klasterNum} ({klasterDoctors.length} Dokter) --</option>
+                              {klasterDoctors.map(d => (
+                                <option key={d.id} value={d.doctorName}>
+                                  👨‍⚕️ {d.doctorName}
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        })()}
                       </td>
 
                       {/* Timestamp_Loket (Blue Link Text - format e.g. 02/09/2026 7:57:02) */}

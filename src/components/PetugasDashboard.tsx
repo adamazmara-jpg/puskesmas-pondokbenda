@@ -40,6 +40,7 @@ import {
   Pill
 } from 'lucide-react';
 import { PoliService, QueueTicket, QueueStatus, SurveyStats, SurveySubmission, DoctorSchedule } from '../types';
+import { INITIAL_DOCTORS } from '../data/mockData';
 import { ConfusionMatrixPage } from './ConfusionMatrixPage';
 import { RmeManagementPanel } from './RmeManagementPanel';
 import { PelayananMedisView } from './PelayananMedisView';
@@ -173,6 +174,7 @@ interface PetugasDashboardProps {
   polis: PoliService[];
   tickets: QueueTicket[];
   onUpdateStatus: (ticketId: string, newStatus: QueueStatus) => void;
+  onUpdateTicket?: (ticketId: string, updates: Partial<QueueTicket>) => void;
   onRefresh: () => void;
   setActiveTab: (tab: string) => void;
 }
@@ -181,6 +183,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
   polis,
   tickets,
   onUpdateStatus,
+  onUpdateTicket,
   onRefresh,
   setActiveTab,
 }) => {
@@ -883,78 +886,118 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
                       <th className="p-3">No Tiket</th>
                       <th className="p-3">Nama Pasien</th>
                       <th className="p-3">Tipe</th>
+                      <th className="p-3">👨‍⚕️ Dokter Pemeriksa (Klaster)</th>
                       <th className="p-3">Status</th>
                       <th className="p-3 text-right">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium">
-                    {poliTickets.map((t) => (
-                      <tr key={t.id} className="hover:bg-slate-50">
-                        <td className="p-3 font-mono font-bold text-slate-900">{t.queueNumber}</td>
-                        <td className="p-3">
-                          <div className="font-bold text-slate-900">{t.fullName}</div>
-                          <div className="text-[10px] text-slate-400">NIK: {t.nik}</div>
-                        </td>
-                        <td className="p-3">
-                          <span className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-bold">
-                            {t.patientType}
-                          </span>
-                        </td>
-                        <td className="p-3">
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              t.status === 'Called'
-                                ? 'bg-amber-400 text-slate-950'
-                                : t.status === 'Verified'
-                                ? 'bg-teal-100 text-teal-800 border border-teal-300 font-extrabold'
-                                : t.status === 'Waiting'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-slate-100 text-slate-500'
-                            }`}
-                          >
-                            {t.status === 'Verified' ? 'Terverifikasi' : t.status}
-                          </span>
-                        </td>
-                        <td className="p-3 text-right space-x-1">
-                          {t.status === 'Waiting' && (
-                            <>
-                              <button
-                                onClick={() => {
-                                  onUpdateStatus(t.id, 'Verified');
-                                  addAuditLog('VERIFIKASI', `Pendaftaran pasien ${t.fullName} (${t.queueNumber}) telah DIVERIFIKASI oleh petugas ${currentUser.name}.`);
-                                }}
-                                className="px-2 py-1 bg-teal-700 text-white rounded font-bold text-[11px] hover:bg-teal-800 shadow-2xs"
-                                title="Verifikasi pendaftaran dan identitas pasien"
-                              >
-                                Verifikasi
-                              </button>
+                    {poliTickets.map((t) => {
+                      const patientKlaster = t.klasterNumber || (
+                        t.poliName?.toLowerCase().includes('kia') || t.poliName?.toLowerCase().includes('anak') || t.poliName?.toLowerCase().includes('ibu') ? 2 :
+                        t.poliName?.toLowerCase().includes('gigi') || t.poliName?.toLowerCase().includes('tb') || t.poliName?.toLowerCase().includes('ispa') ? 4 : 3
+                      );
+
+                      const klasterDoctors = INITIAL_DOCTORS.filter(d => {
+                        if (patientKlaster === 2) return d.klasterNumber === 2;
+                        if (patientKlaster === 3) return d.klasterNumber === 3;
+                        if (patientKlaster === 4) return d.klasterNumber === 4 || d.klasterNumber === 5;
+                        return d.klasterNumber === patientKlaster;
+                      });
+
+                      return (
+                        <tr key={t.id} className="hover:bg-slate-50">
+                          <td className="p-3 font-mono font-bold text-slate-900">{t.queueNumber}</td>
+                          <td className="p-3">
+                            <div className="font-bold text-slate-900">{t.fullName}</div>
+                            <div className="text-[10px] text-slate-400">NIK: {t.nik}</div>
+                          </td>
+                          <td className="p-3">
+                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded font-bold">
+                              {t.patientType}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <select
+                              value={t.doctorName || ''}
+                              onChange={(e) => {
+                                const chosenDoc = e.target.value;
+                                if (onUpdateTicket) {
+                                  onUpdateTicket(t.id, { doctorName: chosenDoc });
+                                }
+                              }}
+                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-300 rounded text-xs font-bold text-emerald-950 focus:outline-none focus:ring-1 focus:ring-emerald-600 cursor-pointer max-w-[210px]"
+                              title={`Pilih dokter jaga khusus Klaster ${patientKlaster}`}
+                            >
+                              <option value="">-- Pilih Dokter Klaster {patientKlaster} --</option>
+                              {klasterDoctors.map(d => (
+                                <option key={d.id} value={d.doctorName}>
+                                  {d.doctorName}
+                                </option>
+                              ))}
+                            </select>
+                            {t.doctorName && (
+                              <div className="text-[10px] text-emerald-700 font-semibold mt-0.5 truncate">
+                                ✓ {t.doctorName}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                t.status === 'Called'
+                                  ? 'bg-amber-400 text-slate-950'
+                                  : t.status === 'Verified'
+                                  ? 'bg-teal-100 text-teal-800 border border-teal-300 font-extrabold'
+                                  : t.status === 'Waiting'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-slate-100 text-slate-500'
+                              }`}
+                            >
+                              {t.status === 'Verified' ? 'Terverifikasi' : t.status}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right space-x-1">
+                            {t.status === 'Waiting' && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    onUpdateStatus(t.id, 'Verified');
+                                    addAuditLog('VERIFIKASI', `Pendaftaran pasien ${t.fullName} (${t.queueNumber}) telah DIVERIFIKASI oleh petugas ${currentUser.name}.`);
+                                  }}
+                                  className="px-2 py-1 bg-teal-700 text-white rounded font-bold text-[11px] hover:bg-teal-800 shadow-2xs"
+                                  title="Verifikasi pendaftaran dan identitas pasien"
+                                >
+                                  Verifikasi
+                                </button>
+                                <button
+                                  onClick={() => onUpdateStatus(t.id, 'Called')}
+                                  className="px-2 py-1 bg-emerald-700 text-white rounded font-bold text-[11px] hover:bg-emerald-800"
+                                >
+                                  Panggil
+                                </button>
+                              </>
+                            )}
+                            {t.status === 'Verified' && (
                               <button
                                 onClick={() => onUpdateStatus(t.id, 'Called')}
                                 className="px-2 py-1 bg-emerald-700 text-white rounded font-bold text-[11px] hover:bg-emerald-800"
                               >
-                                Panggil
+                                Panggil Pasien
                               </button>
-                            </>
-                          )}
-                          {t.status === 'Verified' && (
-                            <button
-                              onClick={() => onUpdateStatus(t.id, 'Called')}
-                              className="px-2 py-1 bg-emerald-700 text-white rounded font-bold text-[11px] hover:bg-emerald-800"
-                            >
-                              Panggil Pasien
-                            </button>
-                          )}
-                          {t.status === 'Called' && (
-                            <button
-                              onClick={() => onUpdateStatus(t.id, 'Completed')}
-                              className="px-2 py-1 bg-blue-600 text-white rounded font-bold text-[11px] hover:bg-blue-700"
-                            >
-                              Selesai
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                            )}
+                            {t.status === 'Called' && (
+                              <button
+                                onClick={() => onUpdateStatus(t.id, 'Completed')}
+                                className="px-2 py-1 bg-blue-600 text-white rounded font-bold text-[11px] hover:bg-blue-700"
+                              >
+                                Selesai
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -971,6 +1014,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
           tickets={tickets}
           onRefresh={onRefresh}
           onUpdateStatus={onUpdateStatus}
+          onUpdateTicketField={onUpdateTicket}
         />
       )}
 
@@ -1080,56 +1124,96 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
                   <th className="p-3">Identitas Pasien</th>
                   <th className="p-3">Poliklinik Tujuan</th>
                   <th className="p-3">Kategori</th>
+                  <th className="p-3">👨‍⚕️ Dokter Pemeriksa (Klaster)</th>
                   <th className="p-3">Status Antrean</th>
                   <th className="p-3 text-right">Ubah Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {filteredAllTickets.map((t) => (
-                  <tr key={t.id} className="hover:bg-slate-50">
-                    <td className="p-3 font-mono font-extrabold text-slate-900">{t.queueNumber}</td>
-                    <td className="p-3">
-                      <div className="font-bold text-slate-900">{t.fullName}</div>
-                      <div className="text-[10px] text-slate-500">NIK: {t.nik} • HP: {t.phone}</div>
-                    </td>
-                    <td className="p-3 font-semibold text-slate-800">{t.poliName}</td>
-                    <td className="p-3">
-                      <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded text-[10px] font-bold">
-                        {t.patientType}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          t.status === 'Called'
-                            ? 'bg-amber-400 text-slate-950'
-                            : t.status === 'Verified'
-                            ? 'bg-teal-100 text-teal-800 border border-teal-300 font-extrabold'
-                            : t.status === 'Waiting'
-                            ? 'bg-emerald-100 text-emerald-800'
-                            : t.status === 'Completed'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-rose-100 text-rose-800'
-                        }`}
-                      >
-                        {t.status === 'Verified' ? 'Terverifikasi' : t.status}
-                      </span>
-                    </td>
-                    <td className="p-3 text-right">
-                      <select
-                        value={t.status || 'Waiting'}
-                        onChange={(e) => onUpdateStatus(t.id, e.target.value as QueueStatus)}
-                        className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-[11px] font-bold text-slate-800"
-                      >
-                        <option value="Waiting">Waiting</option>
-                        <option value="Verified">Verified (Terverifikasi)</option>
-                        <option value="Called">Called</option>
-                        <option value="Completed">Completed</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
+                {filteredAllTickets.map((t) => {
+                  const patientKlaster = t.klasterNumber || (
+                    t.poliName?.toLowerCase().includes('kia') || t.poliName?.toLowerCase().includes('anak') || t.poliName?.toLowerCase().includes('ibu') ? 2 :
+                    t.poliName?.toLowerCase().includes('gigi') || t.poliName?.toLowerCase().includes('tb') || t.poliName?.toLowerCase().includes('ispa') ? 4 : 3
+                  );
+
+                  const klasterDoctors = INITIAL_DOCTORS.filter(d => {
+                    if (patientKlaster === 2) return d.klasterNumber === 2;
+                    if (patientKlaster === 3) return d.klasterNumber === 3;
+                    if (patientKlaster === 4) return d.klasterNumber === 4 || d.klasterNumber === 5;
+                    return d.klasterNumber === patientKlaster;
+                  });
+
+                  return (
+                    <tr key={t.id} className="hover:bg-slate-50">
+                      <td className="p-3 font-mono font-extrabold text-slate-900">{t.queueNumber}</td>
+                      <td className="p-3">
+                        <div className="font-bold text-slate-900">{t.fullName}</div>
+                        <div className="text-[10px] text-slate-500">NIK: {t.nik} • HP: {t.phone}</div>
+                      </td>
+                      <td className="p-3 font-semibold text-slate-800">{t.poliName}</td>
+                      <td className="p-3">
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded text-[10px] font-bold">
+                          {t.patientType}
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <select
+                          value={t.doctorName || ''}
+                          onChange={(e) => {
+                            const chosenDoc = e.target.value;
+                            if (onUpdateTicket) {
+                              onUpdateTicket(t.id, { doctorName: chosenDoc });
+                            }
+                          }}
+                          className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100/70 border border-emerald-300 rounded text-xs font-bold text-emerald-950 focus:outline-none focus:ring-1 focus:ring-emerald-600 cursor-pointer max-w-[210px]"
+                          title={`Pilih dokter jaga khusus Klaster ${patientKlaster}`}
+                        >
+                          <option value="">-- Pilih Dokter Klaster {patientKlaster} --</option>
+                          {klasterDoctors.map(d => (
+                            <option key={d.id} value={d.doctorName}>
+                              {d.doctorName}
+                            </option>
+                          ))}
+                        </select>
+                        {t.doctorName && (
+                          <div className="text-[10px] text-emerald-700 font-semibold mt-0.5 truncate">
+                            ✓ {t.doctorName}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            t.status === 'Called'
+                              ? 'bg-amber-400 text-slate-950'
+                              : t.status === 'Verified'
+                              ? 'bg-teal-100 text-teal-800 border border-teal-300 font-extrabold'
+                              : t.status === 'Waiting'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : t.status === 'Completed'
+                              ? 'bg-blue-100 text-blue-800'
+                              : 'bg-rose-100 text-rose-800'
+                          }`}
+                        >
+                          {t.status === 'Verified' ? 'Terverifikasi' : t.status}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        <select
+                          value={t.status || 'Waiting'}
+                          onChange={(e) => onUpdateStatus(t.id, e.target.value as QueueStatus)}
+                          className="px-2 py-1 bg-slate-100 border border-slate-300 rounded text-[11px] font-bold text-slate-800"
+                        >
+                          <option value="Waiting">Waiting</option>
+                          <option value="Verified">Verified (Terverifikasi)</option>
+                          <option value="Called">Called</option>
+                          <option value="Completed">Completed</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -1245,8 +1329,8 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
                 </div>
 
                 <div className="p-3 bg-white rounded-lg border border-slate-200 text-xs space-y-1">
-                  <div className="font-bold text-slate-900">Dokter Penanggung Jawab:</div>
-                  <div className="text-slate-700 font-medium">dr. H. Ahmad Fauzi, Sp.PD / Tim Bidan</div>
+                  <div className="font-bold text-slate-900">Dokter / Tenaga Medis Penanggung Jawab:</div>
+                  <div className="text-slate-800 font-semibold">{p.doctorName || 'dr. Noftu Indra Mayeni / Tim Medis'}</div>
                   <div className="text-[11px] text-emerald-700 font-bold pt-1">Status: Praktik Berjalan</div>
                 </div>
               </div>

@@ -24,34 +24,42 @@ let surveysStore: SurveySubmission[] = [];
 async function syncFromDbIfAvailable() {
   if (!isDbConnected()) return;
   try {
-    const dbTickets = await queryDb<any>('SELECT * FROM queue_tickets ORDER BY created_at DESC');
+    let dbTickets: any[] = [];
+    try {
+      dbTickets = await queryDb<any>('SELECT * FROM antrean ORDER BY id DESC');
+    } catch {
+      try {
+        dbTickets = await queryDb<any>('SELECT * FROM queue_tickets ORDER BY created_at DESC');
+      } catch {}
+    }
+
     if (dbTickets && dbTickets.length > 0) {
       ticketsStore = dbTickets.map(row => ({
-        id: row.id,
-        queueNumber: row.queue_number,
-        patientType: row.patient_type || 'BPJS',
-        nik: row.nik,
-        bpjsNumber: row.bpjs_number || '',
-        fullName: row.full_name,
-        birthDate: row.birth_date ? String(row.birth_date).slice(0, 10) : '1990-01-01',
-        gender: row.gender || 'L',
-        phone: row.phone,
-        address: row.address || '',
-        poliId: row.poli_id,
-        poliName: row.poli_name,
-        klasterNumber: 3,
+        id: String(row.id || row.id_antrean || `tkt-${Date.now()}`),
+        queueNumber: row.nomor_antrean || row.queue_number || row.no_antrean || 'A-001',
+        patientType: row.jenis_pasien || row.patient_type || (row.no_bpjs ? 'BPJS' : 'Umum'),
+        nik: row.nik || row.nik_pasien || '',
+        bpjsNumber: row.no_bpjs || row.bpjs_number || '',
+        fullName: row.nama_pasien || row.full_name || 'Pasien',
+        birthDate: row.tanggal_lahir || (row.birth_date ? String(row.birth_date).slice(0, 10) : '1990-01-01'),
+        gender: row.jenis_kelamin || row.gender || 'L',
+        phone: row.no_hp || row.phone || '',
+        address: row.alamat || row.address || '',
+        poliId: row.id_poli || row.poli_id || 'poli-umum',
+        poliName: row.nama_poli || row.poli_name || 'Poli Umum',
+        klasterNumber: row.klaster_number || 3,
         klasterName: row.klaster_name || 'UMUM DEWASA',
-        doctorName: '',
+        doctorName: row.nama_dokter || row.doctor_name || '',
         registrationNumber: row.registration_number || '',
         familyHead: 'KEPALA KELUARGA',
-        medicalRecordNo: row.medical_record_no || `03${row.nik?.slice(-6)}`,
+        medicalRecordNo: row.no_rm || row.medical_record_no || `03${row.nik?.slice(-6) || '000000'}`,
         oldMedicalRecordNo: '',
         documentRmNo: '',
         ageFormatted: '',
-        fee: row.patient_type === 'BPJS' ? 'Gratis (BPJS)' : 'Rp. 10,000',
-        appointmentDate: row.appointment_date ? String(row.appointment_date).slice(0, 10) : new Date().toISOString().split('T')[0],
-        timeSlot: row.time_slot || '08:00 - 11:30 WIB',
-        chiefComplaint: row.chief_complaint || 'Pemeriksaan Kesehatan',
+        fee: (row.jenis_pasien === 'BPJS' || row.patient_type === 'BPJS') ? 'Gratis (BPJS)' : 'Rp. 10,000',
+        appointmentDate: row.tanggal_antrean ? String(row.tanggal_antrean).slice(0, 10) : (row.appointment_date ? String(row.appointment_date).slice(0, 10) : new Date().toISOString().split('T')[0]),
+        timeSlot: row.waktu || row.time_slot || '08:00 - 11:30 WIB',
+        chiefComplaint: row.keluhan || row.chief_complaint || 'Pemeriksaan Kesehatan',
         status: row.status || 'Waiting',
         createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
         estimatedTime: row.estimated_time || '',
@@ -251,7 +259,7 @@ app.post('/api/pendaftaran', (req, res) => {
       poliName: poli.name,
       klasterNumber: klasterNumber || 3,
       klasterName: klasterName || 'UMUM DEWASA',
-      doctorName: doctorName || poli.doctorName || 'dr. Ananto Adi Swasono',
+      doctorName: doctorName || poli.doctorName || 'dr. Noftu Indra Mayeni',
       registrationNumber: seqReg,
       familyHead: familyHead || 'KEPALA KELUARGA',
       medicalRecordNo: defaultRm,
@@ -278,13 +286,13 @@ app.post('/api/pendaftaran', (req, res) => {
 
     // Save to MySQL database asynchronously if connected
     if (isDbConnected()) {
+      // Coba simpan ke tabel antrean (struktur db_puskesmas_antrean) atau queue_tickets
       queryDb(`
-        INSERT INTO queue_tickets 
-          (id, queue_number, patient_type, nik, bpjs_number, full_name, birth_date, gender, phone, address, poli_id, poli_name, appointment_date, time_slot, chief_complaint, status, estimated_time, registration_number, klaster_name, medical_record_no)
+        INSERT INTO antrean 
+          (nomor_antrean, jenis_pasien, nik, no_bpjs, nama_pasien, tanggal_lahir, jenis_kelamin, no_hp, alamat, id_poli, nama_poli, tanggal_antrean, waktu, keluhan, status, nama_dokter, no_rm)
         VALUES 
-          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
-        newTicket.id,
         newTicket.queueNumber,
         newTicket.patientType,
         newTicket.nik,
@@ -300,14 +308,41 @@ app.post('/api/pendaftaran', (req, res) => {
         newTicket.timeSlot || '08:00 - 11:30 WIB',
         newTicket.chiefComplaint || 'Pemeriksaan',
         newTicket.status,
-        newTicket.estimatedTime || null,
-        newTicket.registrationNumber || null,
-        newTicket.klasterName || null,
+        newTicket.doctorName || null,
         newTicket.medicalRecordNo || null
       ]).then(() => {
-        console.log(`[Database] Tiket ${newTicket.queueNumber} tersimpan ke MySQL`);
-      }).catch(err => {
-        console.error('[Database] Gagal simpan ke MySQL:', err.message);
+        console.log(`[Database] Tiket ${newTicket.queueNumber} tersimpan ke tabel antrean MySQL`);
+      }).catch(() => {
+        // Fallback ke tabel queue_tickets jika nama tabel berbeda
+        queryDb(`
+          INSERT INTO queue_tickets 
+            (id, queue_number, patient_type, nik, bpjs_number, full_name, birth_date, gender, phone, address, poli_id, poli_name, appointment_date, time_slot, chief_complaint, status, estimated_time, registration_number, klaster_name, medical_record_no)
+          VALUES 
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `, [
+          newTicket.id,
+          newTicket.queueNumber,
+          newTicket.patientType,
+          newTicket.nik,
+          newTicket.bpjsNumber || null,
+          newTicket.fullName,
+          newTicket.birthDate || null,
+          newTicket.gender,
+          newTicket.phone,
+          newTicket.address || null,
+          newTicket.poliId,
+          newTicket.poliName,
+          newTicket.appointmentDate,
+          newTicket.timeSlot || '08:00 - 11:30 WIB',
+          newTicket.chiefComplaint || 'Pemeriksaan',
+          newTicket.status,
+          newTicket.estimatedTime || null,
+          newTicket.registrationNumber || null,
+          newTicket.klasterName || null,
+          newTicket.medicalRecordNo || null
+        ]).catch(err => {
+          console.error('[Database] Gagal simpan ke MySQL:', err.message);
+        });
       });
     }
 

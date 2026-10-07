@@ -49,7 +49,11 @@ import {
   BrainCircuit,
   ClipboardList,
   FileSpreadsheet,
-  Pill
+  Pill,
+  Network,
+  Lock,
+  Unlock,
+  Key
 } from 'lucide-react';
 import { PuskesmasLogo } from './PuskesmasLogo';
 import { PoliService, QueueTicket, DoctorSchedule, HealthArticle, QueueStatus, SurveySubmission } from '../types';
@@ -61,6 +65,7 @@ import { ApotekerFarmasiView } from './ApotekerFarmasiView';
 import { PatientFlowPipelineBar } from './PatientFlowPipelineBar';
 import { ExportExcelModal } from './ExportExcelModal';
 import { SpreadsheetPasienRekap } from './SpreadsheetPasienRekap';
+import { ClassDiagramView } from './ClassDiagramView';
 
 interface AdminDashboardProps {
   polis: PoliService[];
@@ -68,6 +73,8 @@ interface AdminDashboardProps {
   doctors: DoctorSchedule[];
   articles: HealthArticle[];
   onUpdateStatus: (ticketId: string, newStatus: QueueStatus) => void;
+  onUpdateTicket?: (ticketId: string, updates: Partial<QueueTicket>) => void;
+  setTickets?: React.Dispatch<React.SetStateAction<QueueTicket[]>>;
   onRefresh: () => void;
   onCloseAdmin: () => void;
   setArticles: React.Dispatch<React.SetStateAction<HealthArticle[]>>;
@@ -81,6 +88,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   doctors,
   articles,
   onUpdateStatus,
+  onUpdateTicket,
+  setTickets,
   onRefresh,
   onCloseAdmin,
   setArticles,
@@ -89,7 +98,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   // Sidebar tab state
   const [activeMenu, setActiveMenu] = useState<
-    'dashboard' | 'monitor' | 'antrean' | 'google-sheet' | 'pelayanan-medis' | 'farmasi' | 'rme' | 'laporan' | 'dokter' | 'artikel' | 'layanan' | 'pesan' | 'testimoni' | 'cadangan' | 'confusion-matrix'
+    'dashboard' | 'monitor' | 'antrean' | 'google-sheet' | 'pelayanan-medis' | 'farmasi' | 'rme' | 'laporan' | 'dokter' | 'artikel' | 'layanan' | 'pesan' | 'testimoni' | 'cadangan' | 'confusion-matrix' | 'class-diagram'
   >('dashboard');
 
   const [isExportExcelOpen, setIsExportExcelOpen] = useState<boolean>(false);
@@ -142,7 +151,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Login authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false); // Show login screen first
-  const [currentUserRole, setCurrentUserRole] = useState<'admin' | 'it'>('admin');
+  const [currentUserRole, setCurrentUserRole] = useState<'superadmin' | 'admin'>('superadmin');
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loginError, setLoginError] = useState('');
 
@@ -227,7 +236,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     name: '',
     code: '',
     room: 'Lantai 1 - Ruang 101',
-    doctorName: 'dr. H. Bambang Suherman',
+    doctorName: 'dr. Noftu Indra Mayeni',
     operatingHours: 'Senin - Sabtu (08:00 - 14:00 WIB)',
     requirements: '1. KTP / NIK Tangsel\n2. Kartu BPJS Kesehatan (Aktif)\n3. Kartu Berobat Puskesmas',
     feeGeneral: 'Gratis (BPJS) / Rp 10.000 (Umum)',
@@ -459,7 +468,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleDeleteDoctor = async (id: string) => {
-    if (window.confirm('Apakah Anda yakin ingin menghapus jadwal dokter ini?')) {
+    if (currentUserRole !== 'superadmin') {
+      alert('🚫 AKSES DIBATASI: Akun admin@puskesmas.go.id tidak diizinkan menghapus data dokter. Tindakan ini hanya dapat dilakukan oleh superadmin@puskesmas.go.id.');
+      return;
+    }
+
+    if (window.confirm('Apakah Anda yakin ingin menghapus data dokter ini? Tindakan ini permanen.')) {
       try {
         await fetch(`/api/jadwal-dokter/${id}`, { method: 'DELETE' });
       } catch (err) {
@@ -488,14 +502,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       return;
     }
 
-    // List of allowed official staff & admin accounts
-    const isAdminAccount =
-      emailInput === 'admin@puskesmas.go.id' ||
-      emailInput === 'admin@puskesmas-pondokbenda.go.id' ||
-      emailInput === 'admin' ||
-      emailInput === 'ratna';
-
-    const isItAccount =
+    // List of allowed official Super Admin accounts
+    const isSuperAdminAccount =
       emailInput === 'superadmin@puskesmas.go.id' ||
       emailInput === 'it@puskesmas-pondokbenda.go.id' ||
       emailInput === 'it@puskesmas.go.id' ||
@@ -503,28 +511,35 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       emailInput === 'superadmin' ||
       emailInput === 'adam';
 
+    // List of allowed Admin Operasional accounts
+    const isAdminAccount =
+      emailInput === 'admin@puskesmas.go.id' ||
+      emailInput === 'admin@puskesmas-pondokbenda.go.id' ||
+      emailInput === 'admin' ||
+      emailInput === 'ratna';
+
     const isPetugasAccount =
       emailInput === 'petugas@puskesmas.go.id' ||
       emailInput === 'petugas@puskesmas-pondokbenda.go.id' ||
       emailInput === 'petugas' ||
       emailInput === 'budi';
 
-    if (!isAdminAccount && !isItAccount && !isPetugasAccount) {
+    if (!isAdminAccount && !isSuperAdminAccount && !isPetugasAccount) {
       setLoginError(
-        `🚫 AKSES DITOLAK: Akun "${loginForm.email}" BUKAN merupakan Pegawai / Staff / Admin Resmi Puskesmas Pondok Benda. Portal ini terenkripsi khusus untuk Petugas Loket, Dokter, dan Administrator Internal. Masyarakat/Pasien tidak diizinkan masuk ke portal ini.`
+        `🚫 AKSES DITOLAK: Akun "${loginForm.email}" BUKAN merupakan Pegawai / Staff / Admin Resmi Puskesmas Pondok Benda. Portal ini terenkripsi khusus untuk Petugas Loket dan Administrator Internal. Masyarakat/Pasien tidak diizinkan masuk ke portal ini.`
       );
       return;
     }
 
     // Check valid password
-    const validPasswords = ['password', '123456', 'admin123', 'it123', 'petugas123'];
+    const validPasswords = ['password', '123456', 'admin123', 'it123', 'petugas123', 'superadmin'];
     if (!validPasswords.includes(passwordInput)) {
       setLoginError('⚠️ Password kedinasan salah. Silakan periksa kembali password Anda.');
       return;
     }
 
-    if (isItAccount) {
-      setCurrentUserRole('it');
+    if (isSuperAdminAccount) {
+      setCurrentUserRole('superadmin');
     } else {
       setCurrentUserRole('admin');
     }
@@ -620,6 +635,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Poli / Layanan Handlers
   const handleOpenAddPoli = () => {
+    if (currentUserRole !== 'superadmin') {
+      alert('🚫 AKSES DIBATASI: Akun admin@puskesmas.go.id tidak diizinkan menambah layanan poliklinik. Hanya superadmin@puskesmas.go.id yang berwenang.');
+      return;
+    }
     setEditingPoli(null);
     setPoliForm({
       name: '',
@@ -636,6 +655,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleOpenEditPoli = (p: PoliService) => {
+    if (currentUserRole !== 'superadmin') {
+      alert('🚫 AKSES DIBATASI: Akun admin@puskesmas.go.id tidak diizinkan mengedit layanan poliklinik. Hanya superadmin@puskesmas.go.id yang berwenang.');
+      return;
+    }
     setEditingPoli(p);
     setPoliForm({
       name: p.name,
@@ -653,6 +676,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSavePoli = (e: React.FormEvent) => {
     e.preventDefault();
+    if (currentUserRole !== 'superadmin') {
+      alert('🚫 AKSES DIBATASI: Hanya superadmin@puskesmas.go.id yang berwenang menyimpan perubahan poliklinik.');
+      return;
+    }
     if (!poliForm.name) return;
 
     const reqArray = poliForm.requirements
@@ -702,6 +729,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleDeletePoli = (id: string) => {
+    if (currentUserRole !== 'superadmin') {
+      alert('🚫 AKSES DIBATASI: Akun admin@puskesmas.go.id tidak diizinkan menghapus layanan poliklinik. Hanya superadmin@puskesmas.go.id yang berwenang.');
+      return;
+    }
     if (window.confirm('Apakah Anda yakin ingin menghapus layanan Poliklinik ini?')) {
       setPolis(prev => prev.filter(p => p.id !== id));
     }
@@ -850,6 +881,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 placeholder="Masukkan password"
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-600"
               />
+            </div>
+
+            {/* Quick Demo Login Buttons for Super Admin vs Admin */}
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              <span className="text-[10px] font-extrabold uppercase text-slate-400 block text-center">
+                Pilih Akun Demo Pengujian:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginForm({ email: 'superadmin@puskesmas.go.id', password: 'password' });
+                    setLoginError('');
+                  }}
+                  className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl text-left transition"
+                >
+                  <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-[11px]">
+                    <Unlock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Super Admin</span>
+                  </div>
+                  <span className="text-[9px] text-emerald-700 block font-mono">superadmin@puskesmas.go.id</span>
+                  <span className="text-[9px] text-slate-500 block">Akses Penuh: Hapus Dokter & Poli</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginForm({ email: 'admin@puskesmas.go.id', password: 'password' });
+                    setLoginError('');
+                  }}
+                  className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl text-left transition"
+                >
+                  <div className="flex items-center gap-1.5 text-amber-900 font-bold text-[11px]">
+                    <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                    <span>Admin Operasional</span>
+                  </div>
+                  <span className="text-[9px] text-amber-800 block font-mono">admin@puskesmas.go.id</span>
+                  <span className="text-[9px] text-slate-500 block">Terbatas: Tanpa Hapus Dokter/Poli</span>
+                </button>
+              </div>
             </div>
 
             <button
@@ -1040,6 +1111,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleFactoryReset = async () => {
+    if (currentUserRole !== 'superadmin') {
+      alert('🚫 AKSES DIBATASI: Hanya akun superadmin@puskesmas.go.id yang berhak melakukan reset pabrik dan menghapus seluruh data.');
+      return;
+    }
     try {
       setDoctors([...INITIAL_DOCTORS]);
       setArticles([...INITIAL_ARTICLES]);
@@ -1231,6 +1306,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>Confusion Matrix ML</span>
               </button>
 
+              {/* Class Diagram & UML Sistem */}
+              <button
+                onClick={() => setActiveMenu('class-diagram')}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
+                  activeMenu === 'class-diagram'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <Network className="w-4 h-4 shrink-0 text-teal-600" />
+                <span>Class Diagram & UML</span>
+              </button>
+
               {/* Monitor TV */}
               <button
                 onClick={() => setActiveMenu('monitor')}
@@ -1392,6 +1480,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* RIGHT MAIN CONTENT AREA */}
       <main className="flex-1 p-6 sm:p-8 overflow-y-auto max-w-7xl">
+        
+        {/* Persistent User Role Status Bar */}
+        <div className={`mb-6 p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs ${
+          currentUserRole === 'superadmin' ? 'bg-emerald-50/80 border-emerald-300' : 'bg-amber-50/80 border-amber-300'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className={`p-2.5 rounded-xl text-white shrink-0 ${currentUserRole === 'superadmin' ? 'bg-emerald-700' : 'bg-amber-700'}`}>
+              {currentUserRole === 'superadmin' ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-mono font-black text-slate-900">
+                  {currentUserRole === 'superadmin' ? 'superadmin@puskesmas.go.id' : 'admin@puskesmas.go.id'}
+                </span>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                  currentUserRole === 'superadmin' ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
+                }`}>
+                  {currentUserRole === 'superadmin' ? 'Super Admin (Akses Penuh)' : 'Admin Operasional (Terbatas)'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                {currentUserRole === 'superadmin'
+                  ? 'Akses Penuh: Berhak menambah, mengedit, dan MENGHAPUS dokter, layanan poliklinik, serta reset data master.'
+                  : 'Akses Terbatas: Hanya berhak verifikasi pendaftaran & antrean. TIDAK BISA menghapus dokter atau mengedit layanan poliklinik.'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                const nextRole = currentUserRole === 'superadmin' ? 'admin' : 'superadmin';
+                setCurrentUserRole(nextRole);
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border flex items-center gap-1.5 shadow-2xs ${
+                currentUserRole === 'superadmin'
+                  ? 'bg-white hover:bg-emerald-100 text-emerald-800 border-emerald-300'
+                  : 'bg-white hover:bg-amber-100 text-amber-900 border-amber-300'
+              }`}
+              title="Beralih peran pengujian hak akses"
+            >
+              <Key className="w-3.5 h-3.5" />
+              <span>Ganti Akun: {currentUserRole === 'superadmin' ? 'Uji admin@puskesmas.go.id' : 'Uji superadmin@puskesmas.go.id'}</span>
+            </button>
+            <button
+              onClick={() => setIsAuthenticated(false)}
+              className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1"
+              title="Keluar dari sesi"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Logout</span>
+            </button>
+          </div>
+        </div>
         
         {/* VIEW 1: DASHBOARD OVERVIEW (Matching User Screenshot) */}
         {activeMenu === 'dashboard' && (
@@ -1713,7 +1855,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Pengelompokan tim dokter dan tenaga medis sesuai Integrasi Layanan Primer (ILP) Kemenkes RI (Klaster 1 s/d 4 & Lintas Klaster)
+                  Pengelompokan tim dokter dan tenaga medis sesuai Integrasi Layanan Primer (ILP) Kemenkes RI (Klaster 2 s/d 4 & Lintas Klaster)
                 </p>
               </div>
 
@@ -1730,7 +1872,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex flex-wrap gap-2 pt-1 pb-1">
               {[
                 { key: 'all' as const, label: 'Semua Klaster', count: doctors.length, color: 'hover:bg-slate-100' },
-                { key: 1, label: 'Klaster 1 (Manajemen)', count: doctors.filter(d => (d.klasterNumber || 3) === 1).length, color: 'hover:bg-blue-50' },
                 { key: 2, label: 'Klaster 2 (Ibu & Anak)', count: doctors.filter(d => (d.klasterNumber || 3) === 2).length, color: 'hover:bg-pink-50' },
                 { key: 3, label: 'Klaster 3 (Dewasa & Lansia)', count: doctors.filter(d => (d.klasterNumber || 3) === 3).length, color: 'hover:bg-emerald-50' },
                 { key: 4, label: 'Klaster 4 (Penyakit Menular)', count: doctors.filter(d => (d.klasterNumber || 3) === 4).length, color: 'hover:bg-amber-50' },
@@ -1759,16 +1900,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             {/* Klaster Definition Guide Summary */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
-                {
-                  num: 1,
-                  title: 'Klaster 1: Manajemen',
-                  desc: 'Ketatausahaan, Mutu & Pelayanan Publik',
-                  badgeColor: 'bg-blue-50 border-blue-200 text-blue-900',
-                  iconColor: 'text-blue-600',
-                  count: doctors.filter(d => (d.klasterNumber || 3) === 1).length
-                },
                 {
                   num: 2,
                   title: 'Klaster 2: Ibu & Anak',
@@ -2021,13 +2154,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <Edit2 className="w-3.5 h-3.5" />
                             <span>Edit Dokter</span>
                           </button>
-                          <button
-                            onClick={() => handleDeleteDoctor(doc.id)}
-                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Hapus</span>
-                          </button>
+                          
+                          {currentUserRole === 'superadmin' ? (
+                            <button
+                              onClick={() => handleDeleteDoctor(doc.id)}
+                              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition flex items-center gap-1"
+                              title="Hapus dokter (Hak Akses Super Admin)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hapus</span>
+                            </button>
+                          ) : (
+                            <button
+                              disabled
+                              className="px-3 py-1.5 bg-slate-100 text-slate-400 font-bold text-xs rounded-lg border border-slate-200 transition flex items-center gap-1 cursor-not-allowed opacity-60"
+                              title="Hanya superadmin@puskesmas.go.id yang berhak menghapus data dokter"
+                            >
+                              <Lock className="w-3.5 h-3.5" />
+                              <span>Hapus (Super Admin Saja)</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -2127,32 +2273,110 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             {/* Tickets Table */}
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-900 text-white font-bold uppercase">
                   <tr>
                     <th className="p-3">No Tiket</th>
                     <th className="p-3">Nama Pasien</th>
-                    <th className="p-3">Poli</th>
+                    <th className="p-3">Poli / Klaster</th>
                     <th className="p-3">Tipe</th>
+                    <th className="p-3">👨‍⚕️ Dokter Pemeriksa (Pilihan Loket)</th>
                     <th className="p-3">Status</th>
                     <th className="p-3 text-right">Ubah Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {tickets.map((t) => (
-                    <tr key={t.id} className="hover:bg-slate-50">
+                    <tr key={t.id} className="hover:bg-slate-50 transition">
                       <td className="p-3 font-mono font-extrabold text-slate-900">{t.queueNumber}</td>
                       <td className="p-3">
                         <div className="font-bold text-slate-900">{t.fullName}</div>
                         <div className="text-[10px] text-slate-400">NIK: {t.nik}</div>
                       </td>
-                      <td className="p-3 text-slate-700">{t.poliName}</td>
+                      <td className="p-3 text-slate-700">
+                        <div className="font-semibold">{t.poliName}</div>
+                        {t.chiefComplaint && (
+                          <div className="text-[10px] text-slate-500 truncate max-w-[140px]" title={t.chiefComplaint}>
+                            Keluhan: {t.chiefComplaint}
+                          </div>
+                        )}
+                      </td>
                       <td className="p-3">
                         <span className="px-2 py-0.5 bg-slate-100 text-slate-800 font-bold rounded text-[10px]">
                           {t.patientType}
                         </span>
                       </td>
+
+                      {/* Dropdown Loket untuk menentukan/mengubah dokter bagi Pasien ini (HANYA DOKTER SESUAI KLASTER PASIEN) */}
+                      <td className="p-3">
+                        {(() => {
+                          // Filter list dokter yang ada di loket pendaftaran sesuai klaster pasien
+                          const patientKlaster = t.klasterNumber || (
+                            t.poliName?.toLowerCase().includes('kia') || t.poliName?.toLowerCase().includes('anak') || t.poliName?.toLowerCase().includes('ibu') ? 2 :
+                            t.poliName?.toLowerCase().includes('gigi') || t.poliName?.toLowerCase().includes('tb') || t.poliName?.toLowerCase().includes('paru') || t.poliName?.toLowerCase().includes('ispa') ? 4 : 3
+                          );
+
+                          // Dapatkan dokter yang terdaftar di klaster pasien ini saja
+                          const klasterDoctors = doctors.filter(d => {
+                            if (patientKlaster === 2) return d.klasterNumber === 2;
+                            if (patientKlaster === 3) return d.klasterNumber === 3;
+                            if (patientKlaster === 4) return d.klasterNumber === 4 || d.klasterNumber === 5;
+                            return d.klasterNumber === patientKlaster;
+                          });
+
+                          // Fallback jika tidak ada spesifik
+                          const displayDoctors = klasterDoctors.length > 0 ? klasterDoctors : doctors;
+
+                          return (
+                            <div className="space-y-1">
+                              <select
+                                value={t.doctorName || ''}
+                                onChange={(e) => {
+                                  const chosenDocName = e.target.value;
+                                  const matchedDoc = doctors.find(d => d.doctorName === chosenDocName);
+                                  if (onUpdateTicket) {
+                                    onUpdateTicket(t.id, {
+                                      doctorName: chosenDocName,
+                                      ...(matchedDoc ? {
+                                        klasterNumber: matchedDoc.klasterNumber,
+                                        klasterName: matchedDoc.klasterName,
+                                        poliId: matchedDoc.poliId,
+                                        poliName: matchedDoc.poliName
+                                      } : {})
+                                    });
+                                  } else if (setTickets) {
+                                    setTickets(prev => prev.map(item => item.id === t.id ? {
+                                      ...item,
+                                      doctorName: chosenDocName,
+                                      ...(matchedDoc ? {
+                                        klasterNumber: matchedDoc.klasterNumber,
+                                        klasterName: matchedDoc.klasterName,
+                                        poliId: matchedDoc.poliId,
+                                        poliName: matchedDoc.poliName
+                                      } : {})
+                                    } : item));
+                                  }
+                                }}
+                                className="w-full px-2.5 py-1.5 bg-emerald-50/80 hover:bg-emerald-50 border border-emerald-300 rounded-lg text-xs font-bold text-emerald-950 focus:ring-2 focus:ring-emerald-600 focus:outline-none cursor-pointer"
+                              >
+                                <option value="">-- Pilih Dokter Jaga (Klaster {patientKlaster}) --</option>
+                                {displayDoctors.map(d => (
+                                  <option key={d.id} value={d.doctorName}>
+                                    {d.doctorName} ({d.specialty ? d.specialty.split('/')[0].trim() : d.poliName})
+                                  </option>
+                                ))}
+                              </select>
+                              {t.doctorName && (
+                                <span className="text-[10px] text-emerald-700 font-semibold block">
+                                  ✓ Dokter Klaster {patientKlaster}: <strong>{t.doctorName}</strong>
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
+
                       <td className="p-3">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -2199,14 +2423,34 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </p>
               </div>
 
-              <button
-                onClick={handleOpenAddPoli}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-2 shrink-0"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Tambah Layanan Poli Baru</span>
-              </button>
+              {currentUserRole === 'superadmin' ? (
+                <button
+                  onClick={handleOpenAddPoli}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-xs flex items-center gap-2 shrink-0"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Tambah Layanan Poli Baru</span>
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="px-4 py-2.5 bg-slate-100 text-slate-400 font-bold text-xs rounded-xl border border-slate-200 transition flex items-center gap-2 shrink-0 cursor-not-allowed opacity-60"
+                  title="Hanya superadmin@puskesmas.go.id yang berhak menambah layanan poliklinik"
+                >
+                  <Lock className="w-4 h-4" />
+                  <span>Tambah Poli (Super Admin Saja)</span>
+                </button>
+              )}
             </div>
+
+            {currentUserRole !== 'superadmin' && (
+              <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-xs text-amber-900 flex items-center gap-2">
+                <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                <span>
+                  <strong>Mode Terbatas (Admin Operasional):</strong> Akun <code>admin@puskesmas.go.id</code> tidak dapat menambah, mengedit, atau menghapus layanan poliklinik. Pengelolaan master poliklinik hanya dapat dilakukan oleh akun <code>superadmin@puskesmas.go.id</code>.
+                </span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {polis.map((p) => (
@@ -2257,20 +2501,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
 
                   <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button
-                      onClick={() => handleOpenEditPoli(p)}
-                      className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs rounded-lg border border-amber-200 transition flex items-center gap-1"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                      <span>Edit Poli</span>
-                    </button>
-                    <button
-                      onClick={() => handleDeletePoli(p.id)}
-                      className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition flex items-center gap-1"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>Hapus</span>
-                    </button>
+                    {currentUserRole === 'superadmin' ? (
+                      <>
+                        <button
+                          onClick={() => handleOpenEditPoli(p)}
+                          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-xs rounded-lg border border-amber-200 transition flex items-center gap-1"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Edit Poli</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeletePoli(p.id)}
+                          className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition flex items-center gap-1"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Hapus</span>
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[11px] text-slate-400 flex items-center gap-1 font-bold py-1">
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Edit/Hapus Terkunci (Super Admin Saja)</span>
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
@@ -3203,12 +3456,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <ConfusionMatrixPage onBack={() => setActiveMenu('antrean')} />
         )}
 
+        {/* VIEW: CLASS DIAGRAM & UML SISTEM */}
+        {activeMenu === 'class-diagram' && (
+          <ClassDiagramView />
+        )}
+
         {/* VIEW: GOOGLE SHEET REKAP PENDAFTARAN PASIEN */}
         {activeMenu === 'google-sheet' && (
           <SpreadsheetPasienRekap
             tickets={tickets}
             onRefresh={onRefresh}
             onUpdateStatus={onUpdateStatus}
+            onUpdateTicketField={(ticketId, updates) => {
+              if (onUpdateTicket) {
+                onUpdateTicket(ticketId, updates);
+              } else if (setTickets) {
+                setTickets(prev => prev.map(item => item.id === ticketId ? { ...item, ...updates } : item));
+              }
+            }}
           />
         )}
 
@@ -3533,7 +3798,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   onChange={(e) => {
                     const num = Number(e.target.value);
                     const kMap: Record<number, string> = {
-                      1: 'Klaster 1: Manajemen & Tata Kelola',
                       2: 'Klaster 2: Ibu, Anak, dan Remaja',
                       3: 'Klaster 3: Usia Dewasa dan Lanjut Usia',
                       4: 'Klaster 4: Penanggulangan Penyakit Menular',
@@ -3547,7 +3811,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   }}
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
                 >
-                  <option value={1}>Klaster 1: Manajemen & Tata Kelola (Ketatausahaan & Mutu)</option>
                   <option value={2}>Klaster 2: Ibu, Anak, dan Remaja (KIA, Imunisasi, MTBS, KB)</option>
                   <option value={3}>Klaster 3: Usia Dewasa & Lansia (PTM, Skrining, Jiwa, Geriatri)</option>
                   <option value={4}>Klaster 4: Penanggulangan Penyakit Menular (TB, Kusta, DBD, ISPA)</option>

@@ -19,8 +19,10 @@ import {
   Layers,
   ChevronRight,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Network
 } from 'lucide-react';
+import { ClassDiagramView } from './ClassDiagramView';
 
 export interface InformasiViewProps {
   initialSubSection?: string;
@@ -36,6 +38,7 @@ export const INFO_SUBSECTIONS = [
   { id: 'cara-daftar-website', label: 'Cara Daftar Online Via Website', icon: HelpCircle, badge: 'Panduan' },
   { id: 'alur-pendaftaran', label: 'Alur Pendaftaran Online', icon: ArrowRight, badge: 'Flowchart' },
   { id: 'cara-daftar-wa', label: 'Cara Daftar Via Whatsapp', icon: Smartphone, badge: 'WA Center' },
+  { id: 'class-diagram', label: 'Class Diagram & UML Sistem', icon: Network, badge: 'Arsitektur UML' },
   { id: 'survei-ikm', label: 'Survei Kepuasan Masyarakat', icon: MessageSquare, badge: 'IKM Tangsel' },
 ];
 
@@ -449,6 +452,13 @@ export const InformasiView: React.FC<InformasiViewProps> = ({
                 <span>KIRIM PESAN WA SEKARANG (082311366261)</span>
               </a>
             </div>
+          </div>
+        )}
+
+        {/* SECTION: CLASS DIAGRAM & ARSITEKTUR SISTEM UML */}
+        {activeSection === 'class-diagram' && (
+          <div className="pt-2">
+            <ClassDiagramView />
           </div>
         )}
 

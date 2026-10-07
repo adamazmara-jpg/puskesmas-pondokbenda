@@ -18,6 +18,7 @@ import { Footer } from './components/Footer';
 import { PoliService, QueueTicket, DoctorSchedule, HealthArticle, Announcement, QueueStatus } from './types';
 import { INITIAL_POLIS, INITIAL_DOCTORS, INITIAL_ARTICLES, INITIAL_ANNOUNCEMENTS, INITIAL_TICKETS } from './data/mockData';
 import { createRmeForRegisteredPatient } from './data/rmeDatabase';
+import { ClassDiagramView } from './components/ClassDiagramView';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('beranda');
@@ -132,6 +133,13 @@ export default function App() {
     }
   };
 
+  // Update specific fields of a ticket (e.g. assigning doctor from Loket)
+  const handleUpdateTicket = (ticketId: string, updates: Partial<QueueTicket>) => {
+    setTickets((prev) =>
+      prev.map((t) => (t.id === ticketId ? { ...t, ...updates } : t))
+    );
+  };
+
   const handleTicketCreated = (newTicket: QueueTicket) => {
     setTickets((prev) => [newTicket, ...prev]);
     setSearchFilterQuery(newTicket.queueNumber);
@@ -179,6 +187,8 @@ export default function App() {
         doctors={doctors}
         articles={articles}
         onUpdateStatus={handleUpdateTicketStatus}
+        onUpdateTicket={handleUpdateTicket}
+        setTickets={setTickets}
         onRefresh={fetchBackendData}
         onCloseAdmin={() => {
           setIsAdminMode(false);
@@ -303,6 +313,12 @@ export default function App() {
             initialSubSection={infoSubSection}
             setActiveTab={setActiveTab}
           />
+        )}
+
+        {activeTab === 'class-diagram' && (
+          <div className="py-6">
+            <ClassDiagramView />
+          </div>
         )}
 
         {activeTab === 'survei' && <SurveiIKM />}

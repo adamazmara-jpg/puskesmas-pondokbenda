@@ -45,7 +45,7 @@ export const Footer: React.FC<FooterProps> = ({ setActiveTab }) => {
             <div className="space-y-2 text-xs text-slate-700 font-medium">
               <div className="flex items-start gap-2.5">
                 <MapPin className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
-                <span>Jl. Benda Barat XIV A, Pd. Benda, Kec. Pamulang, Kota Tangerang Selatan, Banten 15416</span>
+                <span>Jl. Benda Barat No.14 Perum Pamulang Permai 2, Pondok Benda, Pamulang, Kota Tangerang Selatan, Banten 15416</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <PhoneCall className="w-4 h-4 text-emerald-700 shrink-0" />
