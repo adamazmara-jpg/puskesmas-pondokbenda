@@ -138,7 +138,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 25,
     status: 'Hadir',
     room: 'Ruang KIA / ANC & KB (Lt. 1)',
-    sipNumber: 'SIPB.446.2/028/Dinkes-Tangsel/2023',
     photoUrl: ''
   },
   {
@@ -154,7 +153,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Ruang Imunisasi Bayi & MTBS (Lt. 1)',
-    sipNumber: 'SIPB.446.2/035/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -170,7 +168,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Ruang Pemeriksaan Ibu Hamil',
-    sipNumber: 'SIPB.446.2/041/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -186,7 +183,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Ruang Tumbuh Kembang Bayi',
-    sipNumber: 'SIPB.446.2/048/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -202,7 +198,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Ruang Konseling Laktasi / KIA',
-    sipNumber: 'SIPB.446.2/053/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -218,7 +213,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Ruang Imunisasi Anak & Posyandu',
-    sipNumber: 'SIPB.446.2/059/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -234,7 +228,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Ruang Konseling Remaja & Catin',
-    sipNumber: 'SIPB.446.2/064/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
 
@@ -252,7 +245,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 40,
     status: 'Hadir',
     room: 'Ruang BPU / Pemeriksaan Umum 1',
-    sipNumber: 'SIP.446.1/041/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -268,7 +260,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 35,
     status: 'Hadir',
     room: 'Ruang BPU / Pemeriksaan Umum 2',
-    sipNumber: 'SIP.446.1/052/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -284,7 +275,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 35,
     status: 'Hadir',
     room: 'Ruang Poli Lansia & Skrining Geriatri (Lt. 1)',
-    sipNumber: 'SIP.446.1/068/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -300,7 +290,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Ruang Konsultasi Gizi Terpadu',
-    sipNumber: 'SIPTG.446.5/012/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -316,7 +305,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Koziline Pojok Gizi Online & Konseling',
-    sipNumber: 'SIPTG.446.5/019/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
 
@@ -334,7 +322,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Ruang TB-DOTS & ISPA Terpisah (Lt. 2)',
-    sipNumber: 'SIP.446.1/041/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -350,7 +337,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 50,
     status: 'Hadir',
     room: 'Ruang Triage & Tanda Vital',
-    sipNumber: 'SIPP.446.4/033/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -366,7 +352,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 35,
     status: 'Hadir',
     room: 'Ruang Asuhan Lansia',
-    sipNumber: 'SIPP.446.4/077/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
 
@@ -384,7 +369,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Ruang Poli Gigi Dental Care 1 (Lt. 2)',
-    sipNumber: 'SIPG.446.3/022/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -400,7 +384,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 20,
     status: 'Hadir',
     room: 'Ruang Poli Gigi Dental Care 2 (Lt. 2)',
-    sipNumber: 'SIPG.446.3/031/Dinkes-Tangsel/2024',
     photoUrl: ''
   },
   {
@@ -416,7 +399,6 @@ export const INITIAL_DOCTORS: DoctorSchedule[] = [
     quotaPerDay: 40,
     status: 'Hadir',
     room: 'Ruang Tindakan Medis / UGD Siaga',
-    sipNumber: 'SIPP.446.4/082/Dinkes-Tangsel/2024',
     photoUrl: ''
   }
 ];

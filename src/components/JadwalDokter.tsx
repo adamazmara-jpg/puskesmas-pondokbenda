@@ -186,6 +186,11 @@ export const JadwalDokter: React.FC<JadwalDokterProps> = ({
                     {doc.room && (
                       <p className="text-[11px] text-teal-700 font-semibold">{doc.room}</p>
                     )}
+                    {doc.description && (
+                      <p className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border border-slate-100 italic leading-relaxed mt-1">
+                        "{doc.description}"
+                      </p>
+                    )}
                   </div>
                 </div>
 

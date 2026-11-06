@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   RefreshCw,
   Search,
@@ -29,16 +29,31 @@ import {
   Radio,
   Calendar,
   CalendarDays,
-  Info
+  Info,
+  Tv,
+  Video,
+  Maximize2,
+  Minimize2,
+  UserPlus
 } from 'lucide-react';
-import { PoliService, QueueTicket } from '../types';
+import { PoliService, QueueTicket, HealthArticle } from '../types';
 import {
   playCallChime,
   playSpeechCall,
+  playFullQueueCall,
   requestNotificationPermission,
   isNotificationSupportedAndGranted,
   sendBrowserNotification
 } from '../utils/soundAndNotification';
+import {
+  EducationalTvPlayer,
+  EduVideoItem,
+  DEFAULT_EDU_VIDEOS,
+  extractEduVideos
+} from './EducationalTvPlayer';
+
+export type { EduVideoItem };
+export { DEFAULT_EDU_VIDEOS, extractEduVideos };
 
 interface AntreanRealtimeProps {
   polis: PoliService[];
@@ -46,6 +61,7 @@ interface AntreanRealtimeProps {
   onRefresh: () => void;
   searchFilterQuery?: string;
   onOpenTicketModal?: (ticket: QueueTicket) => void;
+  articles?: HealthArticle[];
 }
 
 export const AntreanRealtime: React.FC<AntreanRealtimeProps> = ({
@@ -54,6 +70,7 @@ export const AntreanRealtime: React.FC<AntreanRealtimeProps> = ({
   onRefresh,
   searchFilterQuery = '',
   onOpenTicketModal,
+  articles = [],
 }) => {
   const [selectedPoliId, setSelectedPoliId] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>(searchFilterQuery);
@@ -90,6 +107,21 @@ export const AntreanRealtime: React.FC<AntreanRealtimeProps> = ({
     doctorName?: string;
     fullName: string;
   } | null>(null);
+
+  // Continuous Educational Video State (Auto-Advance Playlist & Auto-Pause on Scroll Out)
+  const [activeVideoId, setActiveVideoId] = useState<string>('vid-b3');
+  const [isVideoMuted, setIsVideoMuted] = useState<boolean>(true);
+
+  const handleSelectVideo = useCallback((id: string) => {
+    setActiveVideoId(id);
+  }, []);
+
+  const handleToggleVideoMute = useCallback(() => {
+    setIsVideoMuted((prev) => !prev);
+  }, []);
+
+  // Merge default videos with any custom video articles added from Admin Panel
+  const allEduVideos = useMemo(() => extractEduVideos(articles), [articles]);
 
   // Track previous status map to detect when tickets become 'Called'
   const prevTicketStatusesRef = useRef<Record<string, string>>({});
@@ -186,6 +218,33 @@ export const AntreanRealtime: React.FC<AntreanRealtimeProps> = ({
 
   // Daftar tiket yang valid untuk antrean berjalan pada tanggal yang sedang dipantau
   const todayTickets = tickets.filter(isTicketForSelectedDate);
+
+  const latestCalledTicket = useMemo(() => {
+    return todayTickets.find((t) => t.status === 'Called');
+  }, [todayTickets]);
+
+  const currentWaitingCount = useMemo(() => {
+    return todayTickets.filter((t) => t.status === 'Waiting').length;
+  }, [todayTickets]);
+
+  // Automatic voice TTS call whenever a patient ticket is called
+  const lastSpokenTicketRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!latestCalledTicket || !soundEnabled) return;
+    if (lastSpokenTicketRef.current !== latestCalledTicket.id) {
+      lastSpokenTicketRef.current = latestCalledTicket.id;
+      const poliObj = polis.find(p => p.id === latestCalledTicket.poliId);
+      playFullQueueCall(
+        latestCalledTicket.queueNumber,
+        latestCalledTicket.poliName,
+        latestCalledTicket.fullName,
+        poliObj?.room,
+        latestCalledTicket.doctorName
+      );
+    }
+  }, [latestCalledTicket, soundEnabled, polis]);
+
 
   // Find the tracked ticket (bisa mencari nomor tiket hari ini atau tiket booking masa depan)
   const trackedTicket = tickets.find((t) => {
@@ -503,18 +562,17 @@ export const AntreanRealtime: React.FC<AntreanRealtimeProps> = ({
           {/* Test Sound Button */}
           <button
             onClick={() => {
-              playCallChime();
               if (trackedTicket) {
-                playSpeechCall(trackedTicket.queueNumber, trackedTicket.poliName, trackedTicket.doctorName);
+                playFullQueueCall(trackedTicket.queueNumber, trackedTicket.poliName, trackedTicket.fullName, undefined, trackedTicket.doctorName);
               } else {
-                playSpeechCall('A-001', 'Poli Pemeriksaan Umum');
+                playFullQueueCall('A-001', 'Poli Pemeriksaan Umum', 'Bapak Ahmad', 'Ruang 101');
               }
             }}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition border border-slate-200"
-            title="Tes Nada Panggilan Suara"
+            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition border border-emerald-300 shadow-2xs"
+            title="Uji Panggilan Suara Speaker (TTS)"
           >
-            <Play className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Tes Panggilan</span>
+            <Volume2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Uji Panggilan Suara (Speaker)</span>
           </button>
 
           {/* Browser Notification Button */}
@@ -546,22 +604,27 @@ export const AntreanRealtime: React.FC<AntreanRealtimeProps> = ({
 
       {/* =========================================================================
           FEATURE 1: INTERACTIVE PATIENT TRACKER & LIVE COUNTDOWN TIMER CARD
+          TEMA BARU: PUTIH & HIJAU MUDA (SEGAR, CERAH & NYAMAN DILIHAT)
           ========================================================================= */}
-      <div className="bg-gradient-to-br from-emerald-900 via-teal-900 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden border border-emerald-700/40">
+      <div className="bg-gradient-to-br from-white via-emerald-50/70 to-teal-50/60 rounded-3xl p-6 sm:p-8 text-slate-900 shadow-xl relative overflow-hidden border-2 border-emerald-300">
         {/* Decorative Background Circles */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20"></div>
+        <div className="absolute top-0 right-0 w-96 h-96 bg-emerald-200/25 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-teal-200/25 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20"></div>
 
         <div className="relative z-10 space-y-6">
           {/* Header of Tracker */}
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-6 border-b border-emerald-700/60">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pb-6 border-b border-emerald-200">
             <div className="space-y-1">
-              <div className="flex items-center gap-2 text-emerald-300 text-xs font-black uppercase tracking-wider">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>Lacak Antrean & Hitung Mundur Estimasi Panggilan</span>
+              <div className="flex items-center gap-2 text-emerald-800 text-xs font-black uppercase tracking-wider flex-wrap">
+                <Sparkles className="w-4 h-4 text-emerald-600" />
+                <span>Lacak Antrean & TV Edukasi Pasien Siaga</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                  Panggilan Suara Otomatis Aktif
+                </span>
               </div>
-              <h3 className="text-xl sm:text-2xl font-black tracking-tight">
-                {trackedTicket ? `Pelacak Tiket: ${trackedTicket.queueNumber} • ${trackedTicket.fullName}` : 'Cari & Lacak Tiket Antrean Anda'}
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                {trackedTicket ? `Pelacak Tiket: ${trackedTicket.queueNumber} • ${trackedTicket.fullName}` : 'Cari & Lacak Tiket Antrean Sambil Menonton Edukasi'}
               </h3>
             </div>
 
@@ -579,7 +642,7 @@ export const AntreanRealtime: React.FC<AntreanRealtimeProps> = ({
                     }
                   }}
                   placeholder="Masukkan No. Tiket / NIK / Nama..."
-                  className="w-full pl-9 pr-3 py-2 bg-emerald-950/80 border border-emerald-700/60 rounded-xl text-xs font-semibold text-white placeholder:text-emerald-300/60 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  className="w-full pl-9 pr-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-2xs"
                 />
               </div>
               <button
@@ -588,356 +651,507 @@ export const AntreanRealtime: React.FC<AntreanRealtimeProps> = ({
                     setTrackedTicketNumber(trackedInput.trim());
                   }
                 }}
-                className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-xl text-xs font-black transition shrink-0 shadow-xs"
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition shrink-0 shadow-xs"
               >
                 Lacak
               </button>
             </div>
           </div>
 
-          {/* If Ticket Found: Display Countdown & Detailed Live Tracker */}
-          {trackedTicket && trackedStats ? (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-              
-              {/* Left Column: Big Ticket Number & Status */}
-              <div className="lg:col-span-4 bg-emerald-950/60 p-6 rounded-2xl border border-emerald-700/50 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider">
-                    Nomor Antrean Anda
-                  </span>
-                  <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
-                    !isTrackedTicketToday
-                      ? 'bg-blue-500 text-white'
-                      : trackedTicket.status === 'Called'
-                      ? 'bg-amber-400 text-slate-950 animate-pulse'
-                      : trackedTicket.status === 'Waiting'
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-slate-700 text-slate-300'
-                  }`}>
-                    {!isTrackedTicketToday
-                      ? '📅 Booking Terjadwal'
-                      : trackedTicket.status === 'Called'
-                      ? '📢 Sedang Dipanggil'
-                      : trackedTicket.status === 'Waiting'
-                      ? '⏳ Menunggu Hari Ini'
-                      : 'Selesai'}
-                  </span>
-                </div>
+          {/* MAIN TWO-COLUMN INTEGRATED LAYOUT: VIDEO EDUKASI BERJALAN & PELACAK TIKET */}
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            
+            {/* =========================================================================
+                KOLOM KIRI (xl:col-span-6): CONTINUOUS EDUCATIONAL VIDEO PLAYER
+                (TIDAK TER-RESTART / TERPUTUS SAAT PASIEN BARU MENDAFTAR ATAU DIPANGGIL)
+                ========================================================================= */}
+            <div className="xl:col-span-6 space-y-3.5">
+              <EducationalTvPlayer
+                videos={allEduVideos}
+                activeVideoId={activeVideoId}
+                onSelectVideo={handleSelectVideo}
+                isMuted={isVideoMuted}
+                onToggleMute={handleToggleVideoMute}
+                pauseOnScrollOut={true}
+                autoPlayNext={true}
+                showPlaylistSelector={true}
+                titlePrefix="TV Edukasi Siaga Puskesmas"
+              />
 
-                <div className="text-center py-2 bg-emerald-900/40 rounded-xl border border-emerald-600/30">
-                  <div className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-amber-300">
-                    {trackedTicket.queueNumber}
-                  </div>
-                  <p className="text-xs font-bold text-emerald-200 mt-1">{trackedTicket.poliName}</p>
-                </div>
-
-                <div className="text-xs space-y-1.5 text-emerald-100/90 pt-1">
-                  <div className="flex justify-between">
-                    <span className="text-emerald-300/80">Nama Pasien:</span>
-                    <span className="font-bold text-white">{trackedTicket.fullName}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-emerald-300/80">Tanggal Kunjungan:</span>
-                    <span className={`font-bold ${isTrackedTicketToday ? 'text-amber-300' : 'text-cyan-300'}`}>
-                      {formatTanggalKunjungan(trackedTicket.appointmentDate)}
+              {/* Dynamic Real-Time Queue Monitor Bar (White & Light Green Mint) */}
+              <div className="bg-white p-4 rounded-2xl border-2 border-emerald-200/90 space-y-3 shadow-sm">
+                <div className="flex items-center justify-between gap-2 text-xs pb-2 border-b border-emerald-100">
+                  <div className="flex items-center gap-2">
+                    <Radio className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+                    <span className="font-extrabold text-slate-800 text-[11px] uppercase tracking-wider">
+                      Monitor Panggilan & Pendaftaran Terkini
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-emerald-300/80">Dokter:</span>
-                    <span className="font-semibold text-white">{trackedTicket.doctorName || 'Ditentukan Petugas Loket'}</span>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-300">
+                    🟢 Realtime Sync (10s)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                  {/* Card 1: Sedang Dipanggil */}
+                  <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-300 flex items-center justify-between gap-2 shadow-2xs">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-extrabold text-amber-800 uppercase block tracking-wider">
+                        Sedang Dipanggil di Poli
+                      </span>
+                      <div className="font-black text-slate-900 text-sm sm:text-base truncate mt-0.5">
+                        {todayTickets.find(t => t.status === 'Called') ? (
+                          <span className="text-amber-900 font-mono font-black">
+                            {todayTickets.find(t => t.status === 'Called')?.queueNumber}{' '}
+                            <span className="text-xs font-bold text-emerald-800">
+                              • {todayTickets.find(t => t.status === 'Called')?.poliName}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs font-semibold">Belum ada panggilan</span>
+                        )}
+                      </div>
+                    </div>
+                    {todayTickets.find(t => t.status === 'Called') && (
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping shrink-0" />
+                    )}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-emerald-300/80">Jam Daftar:</span>
-                    <span className="font-semibold text-white">{formatJamDaftar(trackedTicket.createdAt)}</span>
+
+                  {/* Card 2: Pasien Baru Terdaftar */}
+                  <div className="p-3 bg-emerald-50/80 rounded-xl border border-emerald-300 flex items-center justify-between gap-2 shadow-2xs">
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-extrabold text-emerald-800 uppercase block tracking-wider">
+                        Pendaftar Terakhir
+                      </span>
+                      <div className="font-black text-slate-900 text-sm sm:text-base truncate mt-0.5">
+                        {todayTickets.length > 0 ? (
+                          <span className="text-emerald-900 font-mono font-black">
+                            {todayTickets[0].queueNumber}{' '}
+                            <span className="text-xs font-bold text-slate-700">
+                              • {todayTickets[0].poliName}
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs font-semibold">-</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-900 bg-emerald-200/80 px-2 py-0.5 rounded-md shrink-0 border border-emerald-400">
+                      {todayTickets.filter(t => t.status === 'Waiting').length} Menunggu
+                    </span>
                   </div>
                 </div>
 
-                {onOpenTicketModal && (
+                <div className="text-[11px] text-emerald-900 flex items-center justify-between gap-2 pt-1 border-t border-emerald-100">
+                  <span className="truncate flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Video edukasi terus berputar lancar sementara nomor antrean diperbarui otomatis.</span>
+                  </span>
                   <button
-                    onClick={() => onOpenTicketModal(trackedTicket)}
-                    className="w-full py-2 bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 border border-emerald-600/50"
+                    onClick={() => onRefresh()}
+                    className="text-emerald-700 hover:text-emerald-900 font-extrabold underline text-[11px] shrink-0"
                   >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>Buka E-Tiket & Barcode</span>
+                    Segarkan Data
                   </button>
-                )}
+                </div>
               </div>
+            </div>
 
-              {/* Middle & Right Column: LIVE COUNTDOWN & ESTIMATION METRICS (ATAU INFO BOOKING JIKA BUKAN HARI INI) */}
-              <div className="lg:col-span-8 space-y-5">
-                {!isTrackedTicketToday ? (
-                  /* ===============================================================
-                     TAMPILAN KHUSUS PASIEN BOOKING HARI KEDEPAN (BUKAN HARI INI)
-                     Sesuai permintaan: Pasien hanya memegang tiket; antrean berjalan
-                     hanya ada saat hari kunjungan/booking tiba.
-                     =============================================================== */
-                  <div className="bg-emerald-950/70 p-6 rounded-2xl border-2 border-dashed border-teal-400/50 space-y-4">
-                    <div className="flex items-start gap-3.5">
-                      <div className="p-3 bg-teal-500/20 text-teal-300 rounded-2xl border border-teal-400/30 shrink-0">
-                        <CalendarDays className="w-7 h-7 text-amber-300" />
-                      </div>
-                      <div className="space-y-1">
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider bg-teal-500/30 text-teal-200 border border-teal-400/40">
-                          <span>Tiket Booking Terjadwal</span>
-                        </div>
-                        <h4 className="text-base sm:text-lg font-black text-white">
-                          Status Antrean Berjalan Belum Dimulai
-                        </h4>
-                        <p className="text-xs text-emerald-200/90 leading-relaxed">
-                          Anda telah berhasil melakukan booking untuk tanggal{' '}
-                          <strong className="text-amber-300 font-extrabold">{formatTanggalKunjungan(trackedTicket.appointmentDate)}</strong>.
-                          Nomor tiket dan identitas Anda telah tersimpan resmi di sistem puskesmas.
-                        </p>
-                        
-                        <div className="bg-emerald-900/90 p-3.5 rounded-xl border border-teal-400/50 text-[11px] text-amber-200 leading-relaxed space-y-1.5 shadow-2xs">
-                          <div className="font-extrabold text-amber-300 flex items-center gap-1.5">
-                            <Info className="w-4 h-4 text-amber-400 shrink-0" />
-                            <span>Mengapa Nama Anda Tidak Muncul di Antrean Berjalan Hari Ini?</span>
-                          </div>
-                          <p className="text-emerald-100">
-                            Sesuai ketentuan pelayanan, monitor <strong>'Antrean Berjalan Saat Ini'</strong> di Puskesmas HANYA menampilkan pasien yang berkunjung pada <strong>HARI INI ({formatTanggalKunjungan(todayDateStr)})</strong>.
-                          </p>
-                          <p className="text-amber-200 font-semibold">
-                            Nama dan nomor antrean Anda baru akan <strong>OTOMATIS AKTIF & TAMPIL</strong> di daftar antrean berjalan saat hari tanggal booking Anda tiba (<strong>{formatTanggalKunjungan(trackedTicket.appointmentDate)}</strong>).
-                          </p>
-                        </div>
-                      </div>
+            {/* KOLOM KANAN (xl:col-span-6): PELACAK TIKET & MONITOR */}
+            <div className="xl:col-span-6 space-y-4">
+              {/* If Ticket Found: Display Countdown & Detailed Live Tracker */}
+              {trackedTicket && trackedStats ? (
+                <div className="space-y-4">
+                  {/* Left Column: Big Ticket Number & Status */}
+                  <div className="bg-white p-6 rounded-2xl border-2 border-emerald-200 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider">
+                        Nomor Antrean Anda
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                        !isTrackedTicketToday
+                          ? 'bg-blue-600 text-white'
+                          : trackedTicket.status === 'Called'
+                          ? 'bg-amber-400 text-slate-950 animate-pulse'
+                          : trackedTicket.status === 'Waiting'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {!isTrackedTicketToday
+                          ? '📅 Booking Terjadwal'
+                          : trackedTicket.status === 'Called'
+                          ? '📢 Sedang Dipanggil'
+                          : trackedTicket.status === 'Waiting'
+                          ? '⏳ Menunggu Hari Ini'
+                          : 'Selesai'}
+                      </span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                      <div className="p-3.5 bg-emerald-900/60 rounded-xl border border-emerald-700/50 text-xs space-y-1">
-                        <span className="text-[11px] font-bold text-emerald-300 block">Jadwal Kedatangan Anda:</span>
-                        <span className="font-extrabold text-white text-sm">
+                    <div className="text-center py-3 bg-emerald-50/80 rounded-xl border-2 border-emerald-200">
+                      <div className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-emerald-800">
+                        {trackedTicket.queueNumber}
+                      </div>
+                      <p className="text-xs font-bold text-emerald-900 mt-1">{trackedTicket.poliName}</p>
+                    </div>
+
+                    <div className="text-xs space-y-1.5 text-slate-600 pt-1">
+                      <div className="flex justify-between border-b border-slate-100 pb-1">
+                        <span className="text-slate-500">Nama Pasien:</span>
+                        <span className="font-bold text-slate-900">{trackedTicket.fullName}</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-100 pb-1">
+                        <span className="text-slate-500">Tanggal Kunjungan:</span>
+                        <span className={`font-bold ${isTrackedTicketToday ? 'text-emerald-700' : 'text-blue-700'}`}>
                           {formatTanggalKunjungan(trackedTicket.appointmentDate)}
                         </span>
-                        <p className="text-[10px] text-emerald-300/70">Poli Tujuan: {trackedTicket.poliName}</p>
                       </div>
-
-                      <div className="p-3.5 bg-emerald-900/60 rounded-xl border border-emerald-700/50 text-xs space-y-1">
-                        <span className="text-[11px] font-bold text-emerald-300 block">Yang Perlu Dibawa:</span>
-                        <span className="font-extrabold text-amber-300 text-sm">
-                          KTP / BPJS Asli & Struk Tiket Ini
-                        </span>
-                        <p className="text-[10px] text-emerald-300/70">Tunjukkan struk ini langsung di Loket saat datang</p>
+                      <div className="flex justify-between border-b border-slate-100 pb-1">
+                        <span className="text-slate-500">Dokter:</span>
+                        <span className="font-semibold text-slate-900">{trackedTicket.doctorName || 'Ditentukan Petugas Loket'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Jam Daftar:</span>
+                        <span className="font-semibold text-slate-900">{formatJamDaftar(trackedTicket.createdAt)}</span>
                       </div>
                     </div>
 
-                    <div className="p-3 bg-teal-900/40 rounded-xl border border-teal-600/30 flex items-center justify-between text-xs text-teal-200">
-                      <span className="flex items-center gap-1.5">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                        <span>E-Tiket & nomor antrean estimasi Anda telah tersimpan dengan aman.</span>
-                      </span>
-                      {onOpenTicketModal && (
-                        <button
-                          onClick={() => onOpenTicketModal(trackedTicket)}
-                          className="text-amber-300 hover:text-amber-200 font-bold underline text-xs shrink-0"
-                        >
-                          Cetak / Unduh PDF
-                        </button>
-                      )}
-                    </div>
+                    {onOpenTicketModal && (
+                      <button
+                        onClick={() => onOpenTicketModal(trackedTicket)}
+                        className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-xs"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>Buka E-Tiket & Barcode</span>
+                      </button>
+                    )}
                   </div>
-                ) : (
-                  /* ===============================================================
-                     TAMPILAN NORMAL JIKA KUNJUNGAN HARI INI (ANTREAN BERJALAN AKTIF)
-                     =============================================================== */
-                  <>
-                    {/* Countdown Timer Display */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      {/* Digital Clock Box */}
-                      <div className="bg-emerald-950/80 p-5 rounded-2xl border border-emerald-700/60 flex flex-col justify-between">
-                        <div className="flex items-center justify-between text-xs font-bold text-emerald-300 mb-1">
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="w-4 h-4 text-amber-400" />
-                            <span>Hitung Mundur</span>
-                          </span>
-                          {trackedTicket.status === 'Waiting' && (
-                            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-                          )}
-                        </div>
-                        <div className="my-2">
-                          {trackedStats.isCalled ? (
-                            <div className="text-2xl sm:text-3xl font-black text-amber-300 font-mono tracking-tight leading-none">
-                              00:00
+
+                  {/* Countdown & Estimation Metrics */}
+                  <div className="space-y-4">
+                    {!isTrackedTicketToday ? (
+                      /* ===============================================================
+                         TAMPILAN KHUSUS PASIEN BOOKING HARI KEDEPAN (BUKAN HARI INI)
+                         =============================================================== */
+                      <div className="bg-emerald-50/70 p-6 rounded-2xl border-2 border-dashed border-emerald-300 space-y-4 shadow-sm">
+                        <div className="flex items-start gap-3.5">
+                          <div className="p-3 bg-emerald-100 text-emerald-800 rounded-2xl border border-emerald-300 shrink-0">
+                            <CalendarDays className="w-7 h-7 text-emerald-700" />
+                          </div>
+                          <div className="space-y-1">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-300">
+                              <span>Tiket Booking Terjadwal</span>
                             </div>
-                          ) : (
-                            <div className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight leading-none">
-                              {formatCountdown(countdownSeconds)}
+                            <h4 className="text-base sm:text-lg font-black text-slate-900">
+                              Status Antrean Berjalan Belum Dimulai
+                            </h4>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                              Anda telah berhasil melakukan booking untuk tanggal{' '}
+                              <strong className="text-emerald-800 font-extrabold">{formatTanggalKunjungan(trackedTicket.appointmentDate)}</strong>.
+                              Nomor tiket dan identitas Anda telah tersimpan resmi di sistem puskesmas.
+                            </p>
+                            
+                            <div className="bg-white p-3.5 rounded-xl border border-emerald-300 text-[11px] text-slate-700 leading-relaxed space-y-1.5 shadow-2xs">
+                              <div className="font-extrabold text-emerald-800 flex items-center gap-1.5">
+                                <Info className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <span>Mengapa Nama Anda Tidak Muncul di Antrean Berjalan Hari Ini?</span>
+                              </div>
+                              <p className="text-slate-600">
+                                Sesuai ketentuan pelayanan, monitor <strong>'Antrean Berjalan Saat Ini'</strong> di Puskesmas HANYA menampilkan pasien yang berkunjung pada <strong>HARI INI ({formatTanggalKunjungan(todayDateStr)})</strong>.
+                              </p>
+                              <p className="text-emerald-800 font-semibold">
+                                Nama dan nomor antrean Anda baru akan <strong>OTOMATIS AKTIF & TAMPIL</strong> di daftar antrean berjalan saat hari tanggal booking Anda tiba (<strong>{formatTanggalKunjungan(trackedTicket.appointmentDate)}</strong>).
+                              </p>
                             </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                          <div className="p-3.5 bg-white rounded-xl border border-emerald-200 text-xs space-y-1 shadow-2xs">
+                            <span className="text-[11px] font-bold text-emerald-800 block">Jadwal Kedatangan Anda:</span>
+                            <span className="font-extrabold text-slate-900 text-sm">
+                              {formatTanggalKunjungan(trackedTicket.appointmentDate)}
+                            </span>
+                            <p className="text-[10px] text-slate-500">Poli Tujuan: {trackedTicket.poliName}</p>
+                          </div>
+
+                          <div className="p-3.5 bg-white rounded-xl border border-emerald-200 text-xs space-y-1 shadow-2xs">
+                            <span className="text-[11px] font-bold text-emerald-800 block">Yang Perlu Dibawa:</span>
+                            <span className="font-extrabold text-emerald-800 text-sm">
+                              KTP / BPJS Asli & Struk Tiket Ini
+                            </span>
+                            <p className="text-[10px] text-slate-500">Tunjukkan struk ini langsung di Loket saat datang</p>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-white rounded-xl border border-emerald-200 flex items-center justify-between text-xs text-slate-700">
+                          <span className="flex items-center gap-1.5">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span>E-Tiket & nomor antrean estimasi Anda telah tersimpan dengan aman.</span>
+                          </span>
+                          {onOpenTicketModal && (
+                            <button
+                              onClick={() => onOpenTicketModal(trackedTicket)}
+                              className="text-emerald-700 hover:text-emerald-900 font-bold underline text-xs shrink-0"
+                            >
+                              Cetak / Unduh PDF
+                            </button>
                           )}
-                        </div>
-                        <span className="text-[11px] font-semibold text-emerald-300/80">
-                          {trackedStats.isCalled
-                            ? 'Giliran Anda Sedang Berlangsung'
-                            : countdownSeconds > 0
-                            ? 'Estimasi waktu hitung mundur'
-                            : 'Harap Bersiap di Depan Poli'}
-                        </span>
-                      </div>
-
-                      {/* Sisa Antrean di Depan Box */}
-                      <div className="bg-emerald-950/80 p-5 rounded-2xl border border-emerald-700/60 flex flex-col justify-between">
-                        <div className="flex items-center justify-between text-xs font-bold text-emerald-300 mb-1">
-                          <span className="flex items-center gap-1.5">
-                            <Users className="w-4 h-4 text-emerald-400" />
-                            <span>Antrean di Depan</span>
-                          </span>
-                        </div>
-                        <div className="my-2">
-                          <div className="text-3xl sm:text-4xl font-black text-amber-300 font-mono tracking-tight leading-none">
-                            {trackedStats.aheadCount} <span className="text-base font-bold text-emerald-200">Pasien</span>
-                          </div>
-                        </div>
-                        <span className="text-[11px] font-semibold text-emerald-300/80">
-                          {trackedStats.isCalled
-                            ? 'Tidak ada antrean di depan'
-                            : trackedStats.aheadCount === 0
-                            ? '🔥 Anda urutan berikutnya!'
-                            : `Posisi ke-${trackedStats.positionInActive} dalam antrean aktif`}
-                        </span>
-                      </div>
-
-                      {/* Estimasi Jam Dipanggil Box */}
-                      <div className="bg-emerald-950/80 p-5 rounded-2xl border border-emerald-700/60 flex flex-col justify-between">
-                        <div className="flex items-center justify-between text-xs font-bold text-emerald-300 mb-1">
-                          <span className="flex items-center gap-1.5">
-                            <Hourglass className="w-4 h-4 text-teal-300" />
-                            <span>Perkiraan Dipanggil</span>
-                          </span>
-                        </div>
-                        <div className="my-2">
-                          <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight leading-none">
-                            {trackedStats.isCalled
-                              ? 'SEKARANG'
-                              : `± ${trackedStats.estimatedMinutes} Menit`}
-                          </div>
-                        </div>
-                        <span className="text-[11px] font-semibold text-emerald-300/80">
-                          Rata-rata 7 mnt / pasien
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Visual Step Progress Bar */}
-                    <div className="p-4 bg-emerald-950/50 rounded-2xl border border-emerald-700/40 space-y-3">
-                      <div className="flex items-center justify-between text-xs font-bold text-emerald-200">
-                        <span>Tahapan Alur Pelayanan Antrean:</span>
-                        <span className="font-bold text-amber-300">
-                          {trackedTicket.status === 'Called'
-                            ? 'Langkah 3: Panggilan Dokter'
-                            : trackedTicket.status === 'Waiting'
-                            ? 'Langkah 2: Menunggu Giliran'
-                            : 'Langkah 4: Selesai Pelayanan'}
-                        </span>
-                      </div>
-
-                      {/* 4-Step Progress Line */}
-                      <div className="grid grid-cols-4 gap-2 pt-1 text-[11px]">
-                        {/* Step 1 */}
-                        <div className="space-y-1.5">
-                          <div className="h-2 rounded-full bg-emerald-400"></div>
-                          <span className="font-bold text-emerald-300 block truncate">1. Terdaftar</span>
-                        </div>
-                        {/* Step 2 */}
-                        <div className="space-y-1.5">
-                          <div className={`h-2 rounded-full ${trackedTicket.status === 'Waiting' || trackedTicket.status === 'Called' || trackedTicket.status === 'Completed' ? 'bg-emerald-400' : 'bg-emerald-900'}`}></div>
-                          <span className={`font-bold block truncate ${trackedTicket.status === 'Waiting' ? 'text-amber-300 animate-pulse' : 'text-emerald-300'}`}>
-                            2. Menunggu ({trackedStats.aheadCount})
-                          </span>
-                        </div>
-                        {/* Step 3 */}
-                        <div className="space-y-1.5">
-                          <div className={`h-2 rounded-full ${trackedTicket.status === 'Called' ? 'bg-amber-400 animate-pulse' : trackedTicket.status === 'Completed' ? 'bg-emerald-400' : 'bg-emerald-900'}`}></div>
-                          <span className={`font-bold block truncate ${trackedTicket.status === 'Called' ? 'text-amber-300 font-black' : 'text-emerald-300/60'}`}>
-                            3. Dipanggil
-                          </span>
-                        </div>
-                        {/* Step 4 */}
-                        <div className="space-y-1.5">
-                          <div className={`h-2 rounded-full ${trackedTicket.status === 'Completed' ? 'bg-emerald-400' : 'bg-emerald-900'}`}></div>
-                          <span className={`font-bold block truncate ${trackedTicket.status === 'Completed' ? 'text-emerald-300' : 'text-emerald-300/60'}`}>
-                            4. Selesai
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Call Status Action Banner */}
-                    {trackedStats.isCalled ? (
-                      <div className="p-4 bg-amber-400 text-slate-950 rounded-2xl flex items-center justify-between gap-4 font-black shadow-lg animate-pulse">
-                        <div className="flex items-center gap-3">
-                          <Megaphone className="w-6 h-6 shrink-0" />
-                          <div>
-                            <div className="text-sm uppercase tracking-wider">NOMOR ANDA SEDANG DIPANGGIL!</div>
-                            <div className="text-xs font-semibold">Silakan segera masuk ke ruang pemeriksaan {trackedTicket.poliName}.</div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setCalledAlertTicket(trackedTicket)}
-                          className="px-4 py-2 bg-slate-950 text-amber-300 rounded-xl text-xs font-black shrink-0 hover:bg-slate-900 transition"
-                        >
-                          Buka Panggilan
-                        </button>
-                      </div>
-                    ) : trackedStats.isNext ? (
-                      <div className="p-3.5 bg-emerald-500/30 border border-emerald-400/60 rounded-xl flex items-center gap-3 text-xs text-emerald-100">
-                        <Flame className="w-5 h-5 text-amber-400 shrink-0 animate-bounce" />
-                        <div>
-                          <span className="font-bold text-white">Giliran Anda Berikutnya!</span> Harap berada di dekat pintu ruang {trackedTicket.poliName} agar segera masuk saat nomor dipanggil.
                         </div>
                       </div>
                     ) : (
-                      <div className="p-3 bg-emerald-950/40 rounded-xl border border-emerald-700/30 flex items-center justify-between text-xs text-emerald-200">
-                        <span className="flex items-center gap-1.5">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                          <span>Notifikasi aktif: Anda akan otomatis diberitahu saat nomor dipanggil.</span>
-                        </span>
-                        <button
-                          onClick={() => playCallChime()}
-                          className="text-amber-300 hover:text-amber-200 font-bold underline text-[11px]"
-                        >
-                          Tes Suara
-                        </button>
-                      </div>
+                      /* ===============================================================
+                         TAMPILAN NORMAL JIKA KUNJUNGAN HARI INI (ANTREAN BERJALAN AKTIF)
+                         =============================================================== */
+                      <>
+                        {/* Countdown Timer Display */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          {/* Digital Clock Box */}
+                          <div className="bg-white p-5 rounded-2xl border-2 border-emerald-200 flex flex-col justify-between shadow-xs">
+                            <div className="flex items-center justify-between text-xs font-bold text-emerald-800 mb-1">
+                              <span className="flex items-center gap-1.5">
+                                <Clock className="w-4 h-4 text-emerald-600" />
+                                <span>Hitung Mundur</span>
+                              </span>
+                              {trackedTicket.status === 'Waiting' && (
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                              )}
+                            </div>
+                            <div className="my-2">
+                              {trackedStats.isCalled ? (
+                                <div className="text-2xl sm:text-3xl font-black text-amber-600 font-mono tracking-tight leading-none">
+                                  00:00
+                                </div>
+                              ) : (
+                                <div className="text-3xl sm:text-4xl font-black text-emerald-800 font-mono tracking-tight leading-none">
+                                  {formatCountdown(countdownSeconds)}
+                                </div>
+                              )}
+                            </div>
+                            <span className="text-[11px] font-semibold text-slate-600">
+                              {trackedStats.isCalled
+                                ? 'Giliran Anda Sedang Berlangsung'
+                                : countdownSeconds > 0
+                                ? 'Estimasi waktu hitung mundur'
+                                : 'Harap Bersiap di Depan Poli'}
+                            </span>
+                          </div>
+
+                          {/* Sisa Antrean di Depan Box */}
+                          <div className="bg-white p-5 rounded-2xl border-2 border-emerald-200 flex flex-col justify-between shadow-xs">
+                            <div className="flex items-center justify-between text-xs font-bold text-emerald-800 mb-1">
+                              <span className="flex items-center gap-1.5">
+                                <Users className="w-4 h-4 text-emerald-600" />
+                                <span>Antrean di Depan</span>
+                              </span>
+                            </div>
+                            <div className="my-2">
+                              <div className="text-3xl sm:text-4xl font-black text-emerald-800 font-mono tracking-tight leading-none">
+                                {trackedStats.aheadCount} <span className="text-base font-bold text-slate-600">Pasien</span>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-semibold text-slate-600">
+                              {trackedStats.isCalled
+                                ? 'Tidak ada antrean di depan'
+                                : trackedStats.aheadCount === 0
+                                ? '🔥 Anda urutan berikutnya!'
+                                : `Posisi ke-${trackedStats.positionInActive} dalam antrean aktif`}
+                            </span>
+                          </div>
+
+                          {/* Estimasi Jam Dipanggil Box */}
+                          <div className="bg-white p-5 rounded-2xl border-2 border-emerald-200 flex flex-col justify-between shadow-xs">
+                            <div className="flex items-center justify-between text-xs font-bold text-emerald-800 mb-1">
+                              <span className="flex items-center gap-1.5">
+                                <Hourglass className="w-4 h-4 text-teal-600" />
+                                <span>Perkiraan Dipanggil</span>
+                              </span>
+                            </div>
+                            <div className="my-2">
+                              <div className="text-2xl sm:text-3xl font-black text-slate-900 font-mono tracking-tight leading-none">
+                                {trackedStats.isCalled
+                                  ? 'SEKARANG'
+                                  : `± ${trackedStats.estimatedMinutes} Menit`}
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-semibold text-slate-500">
+                              Rata-rata 7 mnt / pasien
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Visual Step Progress Bar */}
+                        <div className="p-4 bg-white rounded-2xl border-2 border-emerald-200 space-y-3 shadow-xs">
+                          <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                            <span>Tahapan Alur Pelayanan Antrean:</span>
+                            <span className="font-bold text-emerald-700">
+                              {trackedTicket.status === 'Called'
+                                ? 'Langkah 3: Panggilan Dokter'
+                                : trackedTicket.status === 'Waiting'
+                                ? 'Langkah 2: Menunggu Giliran'
+                                : 'Langkah 4: Selesai Pelayanan'}
+                            </span>
+                          </div>
+
+                          {/* 4-Step Progress Line */}
+                          <div className="grid grid-cols-4 gap-2 pt-1 text-[11px]">
+                            {/* Step 1 */}
+                            <div className="space-y-1.5">
+                              <div className="h-2 rounded-full bg-emerald-500"></div>
+                              <span className="font-bold text-emerald-800 block truncate">1. Terdaftar</span>
+                            </div>
+                            {/* Step 2 */}
+                            <div className="space-y-1.5">
+                              <div className={`h-2 rounded-full ${trackedTicket.status === 'Waiting' || trackedTicket.status === 'Called' || trackedTicket.status === 'Completed' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                              <span className={`font-bold block truncate ${trackedTicket.status === 'Waiting' ? 'text-emerald-700 font-black' : 'text-slate-600'}`}>
+                                2. Menunggu ({trackedStats.aheadCount})
+                              </span>
+                            </div>
+                            {/* Step 3 */}
+                            <div className="space-y-1.5">
+                              <div className={`h-2 rounded-full ${trackedTicket.status === 'Called' ? 'bg-amber-500 animate-pulse' : trackedTicket.status === 'Completed' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                              <span className={`font-bold block truncate ${trackedTicket.status === 'Called' ? 'text-amber-800 font-black' : 'text-slate-400'}`}>
+                                3. Dipanggil
+                              </span>
+                            </div>
+                            {/* Step 4 */}
+                            <div className="space-y-1.5">
+                              <div className={`h-2 rounded-full ${trackedTicket.status === 'Completed' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                              <span className={`font-bold block truncate ${trackedTicket.status === 'Completed' ? 'text-emerald-800 font-bold' : 'text-slate-400'}`}>
+                                4. Selesai
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Call Status Action Banner */}
+                        {trackedStats.isCalled ? (
+                          <div className="p-4 bg-amber-400 text-slate-950 rounded-2xl flex items-center justify-between gap-4 font-black shadow-lg animate-pulse">
+                            <div className="flex items-center gap-3">
+                              <Megaphone className="w-6 h-6 shrink-0" />
+                              <div>
+                                <div className="text-sm uppercase tracking-wider">NOMOR ANDA SEDANG DIPANGGIL!</div>
+                                <div className="text-xs font-semibold">Silakan segera masuk ke ruang pemeriksaan {trackedTicket.poliName}.</div>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => setCalledAlertTicket(trackedTicket)}
+                              className="px-4 py-2 bg-slate-950 text-amber-300 rounded-xl text-xs font-black shrink-0 hover:bg-slate-900 transition"
+                            >
+                              Buka Panggilan
+                            </button>
+                          </div>
+                        ) : trackedStats.isNext ? (
+                          <div className="p-3.5 bg-emerald-100 border border-emerald-300 rounded-xl flex items-center gap-3 text-xs text-emerald-950">
+                            <Flame className="w-5 h-5 text-amber-600 shrink-0 animate-bounce" />
+                            <div>
+                              <span className="font-black text-emerald-900">Giliran Anda Berikutnya!</span> Harap berada di dekat pintu ruang {trackedTicket.poliName} agar segera masuk saat nomor dipanggil.
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-white rounded-xl border border-emerald-200 flex items-center justify-between text-xs text-slate-700 shadow-2xs">
+                            <span className="flex items-center gap-1.5">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                              <span>Notifikasi & suara panggilan aktif saat giliran Anda tiba.</span>
+                            </span>
+                            <button
+                              onClick={() => {
+                                playFullQueueCall(trackedTicket.queueNumber, trackedTicket.poliName, trackedTicket.fullName, undefined, trackedTicket.doctorName);
+                              }}
+                              className="text-emerald-700 hover:text-emerald-900 font-bold underline text-[11px]"
+                            >
+                              Tes Suara
+                            </button>
+                          </div>
+                        )}
+                      </>
                     )}
-                  </>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="p-8 text-center bg-emerald-950/40 rounded-2xl border border-emerald-700/40 space-y-3">
-              <Search className="w-10 h-10 text-emerald-400/80 mx-auto" />
-              <div className="space-y-1">
-                <p className="font-extrabold text-base text-white">
-                  Belum Ada Tiket yang Dipilih untuk Dilacak
-                </p>
-                <p className="text-xs text-emerald-200/80 max-w-md mx-auto">
-                  Ketik nomor tiket antrean (misal: <strong>A-003</strong>) atau NIK Anda pada kolom pencarian di atas, atau klik salah satu baris antrean pada tabel di bawah.
-                </p>
-              </div>
-              {tickets.length > 0 && (
-                <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
-                  <span className="text-xs text-emerald-300 font-medium">Contoh Tiket Aktif:</span>
-                  {tickets.slice(0, 4).map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => setTrackedTicketNumber(t.queueNumber)}
-                      className="px-2.5 py-1 bg-emerald-800/80 hover:bg-emerald-700 text-emerald-100 rounded-lg text-xs font-mono font-bold transition border border-emerald-600/50"
-                    >
-                      {t.queueNumber} ({t.fullName.split(' ')[0]})
-                    </button>
-                  ))}
+                  </div>
+                </div>
+              ) : (
+                /* JIKA BELUM ADA TIKET YANG DILACAK: TAMPILKAN LIVE BOARD PANGGILAN POLI & QUICK FINDER */
+                <div className="bg-white p-6 rounded-2xl border-2 border-emerald-200 space-y-4 shadow-sm">
+                  <div className="text-center space-y-1.5 pb-2 border-b border-emerald-100">
+                    <Tv className="w-8 h-8 text-emerald-600 mx-auto" />
+                    <h4 className="font-extrabold text-base text-slate-900">
+                      Pantau Antrean Sambil Menonton Edukasi
+                    </h4>
+                    <p className="text-xs text-slate-600 max-w-sm mx-auto">
+                      Ketik nomor tiket antrean Anda di kolom pencarian di atas atau pilih salah satu tiket aktif berikut untuk mulai melacak estimasi giliran.
+                    </p>
+                  </div>
+
+                  {/* Quick Select Buttons */}
+                  {todayTickets.length > 0 && (
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-extrabold text-emerald-800 uppercase block tracking-wider">
+                        Pilih Cepat Tiket Antrean Aktif:
+                      </span>
+                      <div className="flex flex-wrap gap-2">
+                        {todayTickets.slice(0, 6).map((t) => (
+                          <button
+                            key={t.id}
+                            onClick={() => setTrackedTicketNumber(t.queueNumber)}
+                            className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 rounded-xl text-xs font-mono font-bold transition border border-emerald-300 flex items-center gap-1.5 shadow-2xs"
+                          >
+                            <span className="text-emerald-700 font-black">{t.queueNumber}</span>
+                            <span className="text-[11px] text-slate-600 font-sans font-medium truncate max-w-[80px]">
+                              {t.fullName.split(' ')[0]}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Live Overview of Poliklinik Calling Status */}
+                  <div className="space-y-2 pt-2">
+                    <span className="text-[11px] font-extrabold text-emerald-800 uppercase block tracking-wider">
+                      Status Panggilan Tiap Poli Hari Ini:
+                    </span>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {polis.slice(0, 4).map((p) => {
+                        const activeT = todayTickets.find((t) => t.poliId === p.id && t.status === 'Called');
+                        const waitingC = todayTickets.filter((t) => t.poliId === p.id && t.status === 'Waiting').length;
+
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => {
+                              setSelectedPoliId(p.id);
+                              if (activeT) setTrackedTicketNumber(activeT.queueNumber);
+                            }}
+                            className="p-3 bg-emerald-50/70 hover:bg-emerald-100/70 rounded-xl border border-emerald-200 transition cursor-pointer flex flex-col justify-between shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-extrabold text-slate-900 text-[11px] truncate">{p.name}</span>
+                              {activeT && <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />}
+                            </div>
+                            <div className="mt-1 flex items-baseline justify-between">
+                              <span className="text-[10px] text-slate-500">Panggilan:</span>
+                              <span className="font-mono font-black text-emerald-700 text-xs">
+                                {activeT ? activeT.queueNumber : '-'}
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between text-[10px] text-slate-600">
+                              <span>Menunggu:</span>
+                              <span className="font-bold text-slate-900">{waitingC} pasien</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
       {/* =========================================================================
           FEATURE 2: POLIKLINIK OVERVIEW CARDS (HANYA MENGHITUNG ANTREAN HARI INI)
           ========================================================================= */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div id="daftar-antrean-realtime" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 scroll-mt-24">
         {polis.map((p) => {
           const activeTicket = todayTickets.find((t) => t.poliId === p.id && t.status === 'Called');
           const waitingCount = todayTickets.filter((t) => t.poliId === p.id && t.status === 'Waiting').length;

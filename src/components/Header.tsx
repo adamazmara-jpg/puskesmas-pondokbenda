@@ -65,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'cara-daftar-website', label: 'Cara Daftar Online Via Website', tab: 'informasi' },
     { id: 'alur-pendaftaran', label: 'Alur Pendaftaran Online', tab: 'informasi' },
     { id: 'cara-daftar-wa', label: 'Cara Daftar Via Whatsapp', tab: 'informasi' },
-    { id: 'class-diagram', label: 'Class Diagram & UML Arsitektur', tab: 'informasi' },
+    { id: 'class-diagram', label: 'Diagram Sistem Usulan & Spek Data', tab: 'informasi' },
     { id: 'survei-ikm', label: 'Survei Kepuasan Masyarakat (IKM)', tab: 'survei' },
   ];
 

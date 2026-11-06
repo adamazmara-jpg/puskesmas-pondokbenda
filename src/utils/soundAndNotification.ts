@@ -33,25 +33,43 @@ export function playCallChime() {
   }
 }
 
-export function playSpeechCall(queueNumber: string, poliName: string, doctorName?: string) {
+export function playSpeechCall(
+  queueNumber: string,
+  poliName: string,
+  patientName?: string,
+  roomName?: string,
+  doctorName?: string
+) {
   try {
     if (!('speechSynthesis' in window)) return;
     
     // Cancel any previous speech
     window.speechSynthesis.cancel();
 
-    // Format queue number for clear vocalization: e.g. "A 0 0 3" or "A 3"
-    const formattedNum = queueNumber.split('').join(' ');
-    const text = `Nomor antrean, ${formattedNum}. Silakan menuju ke ${poliName}.${doctorName ? ' Dokter penanggung jawab ' + doctorName : ''}`;
+    // Format queue number for clear vocalization: e.g. "A 0 0 3"
+    const cleanQueue = queueNumber.replace('-', ' ').split('').join(' ');
+    let text = `Nomor antrean, ${cleanQueue}.`;
+    if (patientName) {
+      text += ` Atas nama ${patientName}.`;
+    }
+    text += ` Silakan menuju ${poliName}`;
+    if (roomName) {
+      text += `, ${roomName}`;
+    }
+    text += '.';
+    if (doctorName) {
+      text += ` Dokter penanggung jawab ${doctorName}.`;
+    }
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'id-ID';
-    utterance.rate = 0.95;
-    utterance.pitch = 1.05;
+    utterance.rate = 0.88;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
 
     // Try to pick an Indonesian voice if available
     const voices = window.speechSynthesis.getVoices();
-    const idVoice = voices.find(v => v.lang.includes('id') || v.lang.includes('ID'));
+    const idVoice = voices.find(v => v.lang.toLowerCase().includes('id') || v.lang.toLowerCase().includes('indonesia'));
     if (idVoice) {
       utterance.voice = idVoice;
     }
@@ -60,6 +78,19 @@ export function playSpeechCall(queueNumber: string, poliName: string, doctorName
   } catch (err) {
     console.warn('Speech synthesis error:', err);
   }
+}
+
+export function playFullQueueCall(
+  queueNumber: string,
+  poliName: string,
+  patientName?: string,
+  roomName?: string,
+  doctorName?: string
+) {
+  playCallChime();
+  setTimeout(() => {
+    playSpeechCall(queueNumber, poliName, patientName, roomName, doctorName);
+  }, 750);
 }
 
 export async function requestNotificationPermission(): Promise<boolean> {

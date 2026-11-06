@@ -40,7 +40,9 @@ export default function App() {
       const saved = localStorage.getItem('puskesmas_doctors_data');
       if (saved) {
         const parsed = JSON.parse(saved);
-        return parsed.map((d: DoctorSchedule) => ({ ...d, photoUrl: '' }));
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
       }
       return INITIAL_DOCTORS;
     } catch {
@@ -244,6 +246,7 @@ export default function App() {
                 onRefresh={fetchBackendData}
                 searchFilterQuery={searchFilterQuery}
                 onOpenTicketModal={(t) => setActiveTicketModal(t)}
+                articles={articles}
               />
 
               <LayananPoli
@@ -283,6 +286,7 @@ export default function App() {
             onRefresh={fetchBackendData}
             searchFilterQuery={searchFilterQuery}
             onOpenTicketModal={(t) => setActiveTicketModal(t)}
+            articles={articles}
           />
         )}
 

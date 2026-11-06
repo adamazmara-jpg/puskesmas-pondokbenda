@@ -30,19 +30,26 @@ export interface PharmacyPrescription {
 // Initial prescriptions start completely empty until doctor examines patient and finishes e-Prescription
 export const INITIAL_PRESCRIPTIONS: PharmacyPrescription[] = [];
 
-const LOCAL_STORAGE_KEY = 'puskesmas_pharmacy_prescriptions_data_v3';
+const LOCAL_STORAGE_KEY = 'puskesmas_pharmacy_prescriptions_data_v4';
+
+const DEPRECATED_KEYS = [
+  'puskesmas_pharmacy_prescriptions_data',
+  'puskesmas_pharmacy_prescriptions_data_v2',
+  'puskesmas_pharmacy_prescriptions_data_v3'
+];
 
 export const getAllPrescriptions = (): PharmacyPrescription[] => {
   try {
-    // Clean up deprecated v1/v2 keys with boilerplate dummy prescriptions
-    if (localStorage.getItem('puskesmas_pharmacy_prescriptions_data_v2')) {
-      localStorage.removeItem('puskesmas_pharmacy_prescriptions_data_v2');
-    }
-    if (localStorage.getItem('puskesmas_pharmacy_prescriptions_data')) {
-      localStorage.removeItem('puskesmas_pharmacy_prescriptions_data');
+    // Clean up deprecated keys with old mock/dummy prescriptions
+    if (typeof window !== 'undefined' && window.localStorage) {
+      DEPRECATED_KEYS.forEach(key => {
+        if (localStorage.getItem(key)) {
+          localStorage.removeItem(key);
+        }
+      });
     }
 
-    const data = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const data = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem(LOCAL_STORAGE_KEY) : null;
     if (data) {
       const parsed: PharmacyPrescription[] = JSON.parse(data);
       if (Array.isArray(parsed)) {
@@ -57,7 +64,9 @@ export const getAllPrescriptions = (): PharmacyPrescription[] => {
 
 export const savePrescriptions = (list: PharmacyPrescription[]) => {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list));
+    }
   } catch (err) {
     console.warn('Failed to save prescriptions to localStorage', err);
   }
@@ -65,9 +74,10 @@ export const savePrescriptions = (list: PharmacyPrescription[]) => {
 
 export const clearAllPrescriptions = () => {
   try {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-    localStorage.removeItem('puskesmas_pharmacy_prescriptions_data_v2');
-    localStorage.removeItem('puskesmas_pharmacy_prescriptions_data');
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      DEPRECATED_KEYS.forEach(key => localStorage.removeItem(key));
+    }
   } catch (err) {
     console.warn('Failed to clear prescriptions', err);
   }

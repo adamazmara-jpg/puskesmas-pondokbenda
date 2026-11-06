@@ -38,7 +38,7 @@ export const INFO_SUBSECTIONS = [
   { id: 'cara-daftar-website', label: 'Cara Daftar Online Via Website', icon: HelpCircle, badge: 'Panduan' },
   { id: 'alur-pendaftaran', label: 'Alur Pendaftaran Online', icon: ArrowRight, badge: 'Flowchart' },
   { id: 'cara-daftar-wa', label: 'Cara Daftar Via Whatsapp', icon: Smartphone, badge: 'WA Center' },
-  { id: 'class-diagram', label: 'Class Diagram & UML Sistem', icon: Network, badge: 'Arsitektur UML' },
+  { id: 'class-diagram', label: 'Diagram Sistem Usulan & Spek Data', icon: Network, badge: 'Bab IV Skripsi' },
   { id: 'survei-ikm', label: 'Survei Kepuasan Masyarakat', icon: MessageSquare, badge: 'IKM Tangsel' },
 ];
 

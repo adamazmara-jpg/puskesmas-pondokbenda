@@ -34,14 +34,12 @@ import {
   EyeOff,
   Download,
   Printer,
-  BrainCircuit,
   ClipboardList,
   Stethoscope,
   Pill
 } from 'lucide-react';
 import { PoliService, QueueTicket, QueueStatus, SurveyStats, SurveySubmission, DoctorSchedule } from '../types';
 import { INITIAL_DOCTORS } from '../data/mockData';
-import { ConfusionMatrixPage } from './ConfusionMatrixPage';
 import { RmeManagementPanel } from './RmeManagementPanel';
 import { PelayananMedisView } from './PelayananMedisView';
 import { ApotekerFarmasiView } from './ApotekerFarmasiView';
@@ -194,8 +192,8 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
   const [showPass, setShowPass] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  // Active subtab inside dashboard: 'loket' | 'sheet' | 'pelayanan-medis' | 'farmasi' | 'pasien' | 'rme' | 'ikm' | 'dokter' | 'system_it' | 'confusion-matrix'
-  const [activeSubTab, setActiveSubTab] = useState<'loket' | 'sheet' | 'pelayanan-medis' | 'farmasi' | 'pasien' | 'rme' | 'ikm' | 'dokter' | 'system_it' | 'confusion-matrix'>('loket');
+  // Active subtab inside dashboard: 'loket' | 'sheet' | 'pelayanan-medis' | 'farmasi' | 'pasien' | 'rme' | 'ikm' | 'dokter' | 'system_it'
+  const [activeSubTab, setActiveSubTab] = useState<'loket' | 'sheet' | 'pelayanan-medis' | 'farmasi' | 'pasien' | 'rme' | 'ikm' | 'dokter' | 'system_it'>('loket');
   const [isExportExcelOpen, setIsExportExcelOpen] = useState<boolean>(false);
 
   // Queue caller states
@@ -689,17 +687,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
           <span>Rekam Medis (RME)</span>
         </button>
 
-        <button
-          onClick={() => setActiveSubTab('confusion-matrix')}
-          className={`px-4 py-2.5 rounded-lg text-xs font-bold whitespace-nowrap transition flex items-center gap-2 ${
-            activeSubTab === 'confusion-matrix'
-              ? 'bg-emerald-600 text-white shadow-xs'
-              : 'text-slate-700 hover:bg-slate-100 font-extrabold'
-          }`}
-        >
-          <BrainCircuit className="w-4 h-4 text-emerald-400" />
-          <span>Uji Confusion Matrix</span>
-        </button>
+
 
         {(currentUser.role === 'admin' || currentUser.role === 'it') && (
           <button
@@ -1453,10 +1441,7 @@ export const PetugasDashboard: React.FC<PetugasDashboardProps> = ({
         <RmeManagementPanel polis={polis} />
       )}
 
-      {/* SUBTAB 6: CONFUSION MATRIX EVALUATION */}
-      {activeSubTab === 'confusion-matrix' && (
-        <ConfusionMatrixPage onBack={() => setActiveSubTab('loket')} />
-      )}
+
 
       {/* MODAL: EXPORT EXCEL LAPORAN */}
       <ExportExcelModal

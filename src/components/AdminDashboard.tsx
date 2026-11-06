@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   LayoutDashboard,
   Radio,
@@ -46,26 +46,22 @@ import {
   Tv,
   Maximize2,
   Minimize2,
-  BrainCircuit,
   ClipboardList,
   FileSpreadsheet,
   Pill,
-  Network,
-  Lock,
-  Unlock,
-  Key
+  Lock
 } from 'lucide-react';
 import { PuskesmasLogo } from './PuskesmasLogo';
 import { PoliService, QueueTicket, DoctorSchedule, HealthArticle, QueueStatus, SurveySubmission } from '../types';
 import { INITIAL_POLIS, INITIAL_DOCTORS, INITIAL_ARTICLES } from '../data/mockData';
-import { ConfusionMatrixPage } from './ConfusionMatrixPage';
 import { RmeManagementPanel } from './RmeManagementPanel';
 import { PelayananMedisView } from './PelayananMedisView';
 import { ApotekerFarmasiView } from './ApotekerFarmasiView';
 import { PatientFlowPipelineBar } from './PatientFlowPipelineBar';
 import { ExportExcelModal } from './ExportExcelModal';
 import { SpreadsheetPasienRekap } from './SpreadsheetPasienRekap';
-import { ClassDiagramView } from './ClassDiagramView';
+import { EducationalTvPlayer, extractEduVideos } from './EducationalTvPlayer';
+import { playFullQueueCall, playCallChime } from '../utils/soundAndNotification';
 
 interface AdminDashboardProps {
   polis: PoliService[];
@@ -98,15 +94,70 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 }) => {
   // Sidebar tab state
   const [activeMenu, setActiveMenu] = useState<
-    'dashboard' | 'monitor' | 'antrean' | 'google-sheet' | 'pelayanan-medis' | 'farmasi' | 'rme' | 'laporan' | 'dokter' | 'artikel' | 'layanan' | 'pesan' | 'testimoni' | 'cadangan' | 'confusion-matrix' | 'class-diagram'
+    'dashboard' | 'monitor' | 'antrean' | 'google-sheet' | 'pelayanan-medis' | 'farmasi' | 'rme' | 'laporan' | 'dokter' | 'artikel' | 'layanan' | 'pesan' | 'testimoni' | 'cadangan'
   >('dashboard');
 
   const [isExportExcelOpen, setIsExportExcelOpen] = useState<boolean>(false);
 
-  // TV Monitor View & Audio Call State
+  // TV Monitor View & Educational Video State
   const [isFullscreenTv, setIsFullscreenTv] = useState<boolean>(false);
+  const [isNativeFullscreen, setIsNativeFullscreen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsNativeFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  const toggleNativeFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        } else if ((document.documentElement as any).webkitRequestFullscreen) {
+          await (document.documentElement as any).webkitRequestFullscreen();
+        } else if ((document.documentElement as any).msRequestFullscreen) {
+          await (document.documentElement as any).msRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn('Native Fullscreen request blocked or not allowed:', err);
+    }
+  };
+
+  const handleOpenFullscreenTv = async (withBrowserFullscreen = true) => {
+    setIsFullscreenTv(true);
+    if (withBrowserFullscreen && !document.fullscreenElement) {
+      await toggleNativeFullscreen();
+    }
+  };
+
+  const handleCloseFullscreenTv = async () => {
+    setIsFullscreenTv(false);
+    if (document.fullscreenElement) {
+      await toggleNativeFullscreen();
+    }
+  };
+
   const [selectedMonitorPoli, setSelectedMonitorPoli] = useState<string>('all');
   const [isAudioEnabled, setIsAudioEnabled] = useState<boolean>(true);
+  const [adminActiveVideoId, setAdminActiveVideoId] = useState<string>('vid-b3');
+  const [isAdminVideoMuted, setIsAdminVideoMuted] = useState<boolean>(true);
+  const adminEduVideos = useMemo(() => extractEduVideos(articles), [articles]);
 
   // Backup & Restore State
   const [backupSnapshots, setBackupSnapshots] = useState<Array<{
@@ -129,24 +180,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [backupAlert, setBackupAlert] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
-  // Helper: Text to speech voice call for queue
+  // Helper: Text to speech voice call for queue (Chime + Indonesian TTS)
   const speakQueueCall = (queueNumber: string, patientName: string, poliName: string, room: string) => {
     if (!isAudioEnabled) return;
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const cleanQueue = queueNumber.replace('-', ' ');
-      const speechText = `Nomor antrean ${cleanQueue}, atas nama ${patientName}, silakan menuju ${poliName}, ${room}.`;
-      const utterance = new SpeechSynthesisUtterance(speechText);
-      utterance.lang = 'id-ID';
-      utterance.rate = 0.88;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-      window.speechSynthesis.speak(utterance);
-    }
+    playFullQueueCall(queueNumber, poliName, patientName, room);
   };
 
   const handleTestAudio = () => {
-    speakQueueCall('A-001', 'Bapak Ahmad', 'Poli Umum', 'Lantai 1 Ruang 101');
+    if (!isAudioEnabled) setIsAudioEnabled(true);
+    speakQueueCall('A-001', 'Bapak Ahmad', 'Poli Pemeriksaan Umum', 'Lantai 1 Ruang 101');
   };
 
   // Login authentication state
@@ -213,6 +255,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isDoctorModalOpen, setIsDoctorModalOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<DoctorSchedule | null>(null);
   const [selectedDoctorKlaster, setSelectedDoctorKlaster] = useState<number | 'all'>('all');
+  const [doctorToDelete, setDoctorToDelete] = useState<DoctorSchedule | null>(null);
+  const [actionNotification, setActionNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [doctorForm, setDoctorForm] = useState({
     doctorName: '',
     specialty: 'Dokter Umum / Penanggung Jawab',
@@ -226,7 +270,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     status: 'Hadir' as DoctorSchedule['status'],
     photoUrl: '',
     sipNumber: '',
-    room: 'Ruang BPU / Pemeriksaan Umum'
+    room: 'Ruang BPU / Pemeriksaan Umum',
+    description: ''
   });
 
   // Modal States for Add/Edit Poliklinik & Layanan
@@ -390,8 +435,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       quotaPerDay: 30,
       status: 'Hadir' as DoctorSchedule['status'],
       photoUrl: '',
-      sipNumber: '446.1/045/SIP.D/DPMPTSP/2024',
-      room: 'Ruang BPU (Pemeriksaan Dewasa)'
+      room: 'Ruang BPU (Pemeriksaan Dewasa)',
+      description: ''
     });
     setIsDoctorModalOpen(true);
   };
@@ -410,8 +455,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       quotaPerDay: doc.quotaPerDay || 30,
       status: doc.status || 'Hadir',
       photoUrl: doc.photoUrl || '',
-      sipNumber: doc.sipNumber || '446.1/045/SIP.D/DPMPTSP/2024',
-      room: doc.room || 'Ruang Pemeriksaan'
+      room: doc.room || 'Ruang Pemeriksaan',
+      description: doc.description || ''
     });
     setIsDoctorModalOpen(true);
   };
@@ -420,9 +465,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     e.preventDefault();
     if (!doctorForm.doctorName) return;
 
-    const daysArray = doctorForm.days.split(',').map(s => s.trim());
+    const daysArray = doctorForm.days
+      ? (Array.isArray(doctorForm.days) ? doctorForm.days : doctorForm.days.split(',').map(s => s.trim()).filter(Boolean))
+      : ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
 
     if (editingDoctor) {
+      const updatedDoc: DoctorSchedule = {
+        ...editingDoctor,
+        ...doctorForm,
+        days: daysArray
+      };
+
+      setDoctors(prev => {
+        const next = prev.map(d => (d.id === editingDoctor.id ? updatedDoc : d));
+        try {
+          localStorage.setItem('puskesmas_doctors_data', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
       try {
         await fetch(`/api/jadwal-dokter/${editingDoctor.id}`, {
           method: 'PUT',
@@ -432,56 +493,88 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       } catch (err) {
         console.log(err);
       }
-      setDoctors(prev =>
-        prev.map(d => (d.id === editingDoctor.id ? { ...d, ...doctorForm, days: daysArray } : d))
-      );
+
+      setActionNotification({
+        type: 'success',
+        message: `Data & profil ${doctorForm.doctorName} berhasil diperbarui.`
+      });
     } else {
+      const newDoc: DoctorSchedule = {
+        id: `doc-${Date.now()}`,
+        ...doctorForm,
+        days: daysArray
+      };
+
+      setDoctors(prev => {
+        const next = [newDoc, ...prev];
+        try {
+          localStorage.setItem('puskesmas_doctors_data', JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
       try {
-        const res = await fetch('/api/jadwal-dokter', {
+        await fetch('/api/jadwal-dokter', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...doctorForm, days: daysArray })
         });
-        const data = await res.json();
-        if (data.success && data.data) {
-          setDoctors(prev => [data.data, ...prev]);
-        } else {
-          const newDoc: DoctorSchedule = {
-            id: `doc-${Date.now()}`,
-            ...doctorForm,
-            days: daysArray
-          };
-          setDoctors(prev => [newDoc, ...prev]);
-        }
-      } catch (err) {
-        const newDoc: DoctorSchedule = {
-          id: `doc-${Date.now()}`,
-          ...doctorForm,
-          days: daysArray
-        };
-        setDoctors(prev => [newDoc, ...prev]);
-      }
-    }
-
-    onRefresh();
-    setIsDoctorModalOpen(false);
-  };
-
-  const handleDeleteDoctor = async (id: string) => {
-    if (currentUserRole !== 'superadmin') {
-      alert('🚫 AKSES DIBATASI: Akun admin@puskesmas.go.id tidak diizinkan menghapus data dokter. Tindakan ini hanya dapat dilakukan oleh superadmin@puskesmas.go.id.');
-      return;
-    }
-
-    if (window.confirm('Apakah Anda yakin ingin menghapus data dokter ini? Tindakan ini permanen.')) {
-      try {
-        await fetch(`/api/jadwal-dokter/${id}`, { method: 'DELETE' });
       } catch (err) {
         console.log(err);
       }
-      setDoctors(prev => prev.filter(d => d.id !== id));
-      onRefresh();
+
+      setActionNotification({
+        type: 'success',
+        message: `Dokter ${doctorForm.doctorName} berhasil ditambahkan.`
+      });
     }
+
+    setTimeout(() => {
+      onRefresh();
+    }, 400);
+
+    setIsDoctorModalOpen(false);
+  };
+
+  const handleRequestDeleteDoctor = (doc: DoctorSchedule) => {
+    if (currentUserRole !== 'superadmin') {
+      setActionNotification({
+        type: 'error',
+        message: 'Akses Dibatasi: Hanya Super Admin (superadmin@puskesmas.go.id) yang dapat menghapus data dokter.'
+      });
+      return;
+    }
+    setDoctorToDelete(doc);
+  };
+
+  const confirmDeleteDoctor = async () => {
+    if (!doctorToDelete) return;
+    const targetId = doctorToDelete.id;
+    const targetName = doctorToDelete.doctorName;
+
+    setDoctors(prev => {
+      const next = prev.filter(d => d.id !== targetId);
+      try {
+        localStorage.setItem('puskesmas_doctors_data', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    try {
+      await fetch(`/api/jadwal-dokter/${targetId}`, { method: 'DELETE' });
+    } catch (err) {
+      console.log(err);
+    }
+
+    setDoctorToDelete(null);
+    setActionNotification({
+      type: 'success',
+      message: `Data dokter ${targetName} berhasil dihapus permanen.`
+    });
+
+    setTimeout(() => {
+      onRefresh();
+    }, 400);
   };
 
   // Login Handler
@@ -883,45 +976,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               />
             </div>
 
-            {/* Quick Demo Login Buttons for Super Admin vs Admin */}
-            <div className="pt-2 border-t border-slate-100 space-y-2">
-              <span className="text-[10px] font-extrabold uppercase text-slate-400 block text-center">
-                Pilih Akun Demo Pengujian:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginForm({ email: 'superadmin@puskesmas.go.id', password: 'password' });
-                    setLoginError('');
-                  }}
-                  className="p-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl text-left transition"
-                >
-                  <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-[11px]">
-                    <Unlock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>Super Admin</span>
-                  </div>
-                  <span className="text-[9px] text-emerald-700 block font-mono">superadmin@puskesmas.go.id</span>
-                  <span className="text-[9px] text-slate-500 block">Akses Penuh: Hapus Dokter & Poli</span>
-                </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setLoginForm({ email: 'admin@puskesmas.go.id', password: 'password' });
-                    setLoginError('');
-                  }}
-                  className="p-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl text-left transition"
-                >
-                  <div className="flex items-center gap-1.5 text-amber-900 font-bold text-[11px]">
-                    <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                    <span>Admin Operasional</span>
-                  </div>
-                  <span className="text-[9px] text-amber-800 block font-mono">admin@puskesmas.go.id</span>
-                  <span className="text-[9px] text-slate-500 block">Terbatas: Tanpa Hapus Dokter/Poli</span>
-                </button>
-              </div>
-            </div>
 
             <button
               type="submit"
@@ -1293,31 +1348,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>Farmasi & Apoteker</span>
               </button>
 
-              {/* Confusion Matrix */}
-              <button
-                onClick={() => setActiveMenu('confusion-matrix')}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
-                  activeMenu === 'confusion-matrix'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <BrainCircuit className="w-4 h-4 shrink-0 text-emerald-500" />
-                <span>Confusion Matrix ML</span>
-              </button>
-
-              {/* Class Diagram & UML Sistem */}
-              <button
-                onClick={() => setActiveMenu('class-diagram')}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition ${
-                  activeMenu === 'class-diagram'
-                    ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'text-slate-700 hover:bg-slate-100'
-                }`}
-              >
-                <Network className="w-4 h-4 shrink-0 text-teal-600" />
-                <span>Class Diagram & UML</span>
-              </button>
 
               {/* Monitor TV */}
               <button
@@ -1466,8 +1496,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </nav>
         </div>
 
-        {/* Sidebar Footer Link: Kembali ke Situs */}
-        <div className="p-4 border-t border-slate-100">
+        {/* Sidebar Footer Link: User Info, Logout & Kembali ke Situs */}
+        <div className="p-3 border-t border-slate-100 space-y-2">
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+            <div className="min-w-0 pr-2">
+              <span className="text-xs font-bold text-slate-800 block truncate font-mono">
+                {currentUserRole === 'superadmin' ? 'superadmin' : 'admin'}
+              </span>
+              <span className={`text-[9px] font-black uppercase tracking-wider block ${
+                currentUserRole === 'superadmin' ? 'text-emerald-600' : 'text-amber-600'
+              }`}>
+                {currentUserRole === 'superadmin' ? 'Super Admin' : 'Admin'}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                setIsAuthenticated(false);
+                setLoginForm({ email: '', password: '' });
+              }}
+              className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+              title="Logout"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+
           <button
             onClick={onCloseAdmin}
             className="w-full flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-emerald-700 transition py-2 px-3 rounded-lg hover:bg-slate-50"
@@ -1480,60 +1533,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       {/* RIGHT MAIN CONTENT AREA */}
       <main className="flex-1 p-6 sm:p-8 overflow-y-auto max-w-7xl">
-        
-        {/* Persistent User Role Status Bar */}
-        <div className={`mb-6 p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs ${
-          currentUserRole === 'superadmin' ? 'bg-emerald-50/80 border-emerald-300' : 'bg-amber-50/80 border-amber-300'
-        }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl text-white shrink-0 ${currentUserRole === 'superadmin' ? 'bg-emerald-700' : 'bg-amber-700'}`}>
-              {currentUserRole === 'superadmin' ? <Unlock className="w-5 h-5" /> : <Lock className="w-5 h-5" />}
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-mono font-black text-slate-900">
-                  {currentUserRole === 'superadmin' ? 'superadmin@puskesmas.go.id' : 'admin@puskesmas.go.id'}
-                </span>
-                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                  currentUserRole === 'superadmin' ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'
-                }`}>
-                  {currentUserRole === 'superadmin' ? 'Super Admin (Akses Penuh)' : 'Admin Operasional (Terbatas)'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-600 mt-0.5">
-                {currentUserRole === 'superadmin'
-                  ? 'Akses Penuh: Berhak menambah, mengedit, dan MENGHAPUS dokter, layanan poliklinik, serta reset data master.'
-                  : 'Akses Terbatas: Hanya berhak verifikasi pendaftaran & antrean. TIDAK BISA menghapus dokter atau mengedit layanan poliklinik.'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => {
-                const nextRole = currentUserRole === 'superadmin' ? 'admin' : 'superadmin';
-                setCurrentUserRole(nextRole);
-              }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border flex items-center gap-1.5 shadow-2xs ${
-                currentUserRole === 'superadmin'
-                  ? 'bg-white hover:bg-emerald-100 text-emerald-800 border-emerald-300'
-                  : 'bg-white hover:bg-amber-100 text-amber-900 border-amber-300'
-              }`}
-              title="Beralih peran pengujian hak akses"
-            >
-              <Key className="w-3.5 h-3.5" />
-              <span>Ganti Akun: {currentUserRole === 'superadmin' ? 'Uji admin@puskesmas.go.id' : 'Uji superadmin@puskesmas.go.id'}</span>
-            </button>
-            <button
-              onClick={() => setIsAuthenticated(false)}
-              className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1"
-              title="Keluar dari sesi"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Logout</span>
-            </button>
-          </div>
-        </div>
         
         {/* VIEW 1: DASHBOARD OVERVIEW (Matching User Screenshot) */}
         {activeMenu === 'dashboard' && (
@@ -2058,14 +2057,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <span className="font-bold text-slate-800 text-[11px]">{doc.room}</span>
                             </div>
                           )}
-                          {doc.sipNumber && (
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-500">No. SIP:</span>
-                              <span className="font-semibold text-slate-700 text-[10px] truncate max-w-[160px]" title={doc.sipNumber}>
-                                {doc.sipNumber}
-                              </span>
-                            </div>
-                          )}
                           <div className="flex items-center justify-between">
                             <span className="text-slate-500">Hari Praktik:</span>
                             <span className="font-bold text-slate-800">
@@ -2080,6 +2071,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <span className="text-slate-500">Kuota Harian:</span>
                             <span className="font-extrabold text-emerald-700">{doc.quotaPerDay || 30} Pasien / Hari</span>
                           </div>
+                          {doc.description && (
+                            <div className="pt-1.5 border-t border-slate-200/60">
+                              <span className="text-[10px] text-slate-400 block font-bold mb-0.5">Deskripsi / Profil:</span>
+                              <p className="text-[11px] text-slate-700 italic bg-white p-2 rounded-xl border border-slate-200/80 leading-relaxed">
+                                "{doc.description}"
+                              </p>
+                            </div>
+                          )}
                         </div>
 
                         {/* Presensi Cepat Daftar Hadir */}
@@ -2155,25 +2154,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <span>Edit Dokter</span>
                           </button>
                           
-                          {currentUserRole === 'superadmin' ? (
-                            <button
-                              onClick={() => handleDeleteDoctor(doc.id)}
-                              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition flex items-center gap-1"
-                              title="Hapus dokter (Hak Akses Super Admin)"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Hapus</span>
-                            </button>
-                          ) : (
-                            <button
-                              disabled
-                              className="px-3 py-1.5 bg-slate-100 text-slate-400 font-bold text-xs rounded-lg border border-slate-200 transition flex items-center gap-1 cursor-not-allowed opacity-60"
-                              title="Hanya superadmin@puskesmas.go.id yang berhak menghapus data dokter"
-                            >
-                              <Lock className="w-3.5 h-3.5" />
-                              <span>Hapus (Super Admin Saja)</span>
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleRequestDeleteDoctor(doc)}
+                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-lg border border-rose-200 transition flex items-center gap-1"
+                            title="Hapus dokter (Super Admin)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Hapus</span>
+                          </button>
                         </div>
                       </div>
                     );
@@ -2214,13 +2202,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>Buka Pemeriksaan Dokter ➔</span>
                 </button>
 
-                <button
-                  onClick={() => setActiveMenu('confusion-matrix')}
-                  className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-md border border-slate-800 transition flex items-center gap-2.5 shrink-0"
-                >
-                  <BrainCircuit className="w-4 h-4 text-emerald-400 animate-pulse" />
-                  <span>Uji Confusion Matrix Model AI</span>
-                </button>
+
               </div>
             </div>
 
@@ -2443,14 +2425,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               )}
             </div>
 
-            {currentUserRole !== 'superadmin' && (
-              <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-2xl text-xs text-amber-900 flex items-center gap-2">
-                <Lock className="w-4 h-4 text-amber-700 shrink-0" />
-                <span>
-                  <strong>Mode Terbatas (Admin Operasional):</strong> Akun <code>admin@puskesmas.go.id</code> tidak dapat menambah, mengedit, atau menghapus layanan poliklinik. Pengelolaan master poliklinik hanya dapat dilakukan oleh akun <code>superadmin@puskesmas.go.id</code>.
-                </span>
-              </div>
-            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {polis.map((p) => (
@@ -2835,13 +2809,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>{isAudioEnabled ? 'Suara Aktif' : 'Suara Muted'}</span>
                 </button>
 
-                {/* Fullscreen TV Mode Toggle */}
+                {/* Full Screen Mode Button (Hides browser UI for optimal TV display) */}
+                <button
+                  onClick={() => handleOpenFullscreenTv(true)}
+                  className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-extrabold text-xs rounded-xl transition shadow-sm flex items-center gap-2 cursor-pointer border border-emerald-500/40"
+                  title="Buka Mode Display TV Full Screen (Sembunyikan Address Bar & UI Browser untuk Tampilan TV Penuh)"
+                >
+                  <Maximize2 className="w-4 h-4 text-emerald-200" />
+                  <span>Full Screen TV (Sembunyikan UI Browser)</span>
+                </button>
+
+                {/* Standard Fullscreen TV Mode Toggle */}
                 <button
                   onClick={() => setIsFullscreenTv(!isFullscreenTv)}
-                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition shadow-xs flex items-center gap-2"
+                  className="px-3.5 py-2.5 bg-white hover:bg-emerald-50 text-emerald-800 font-extrabold text-xs rounded-xl transition border-2 border-emerald-300 flex items-center gap-2 cursor-pointer shadow-xs"
+                  title="Tampilkan Display TV Pasien & Video Edukasi"
                 >
-                  <Tv className="w-4 h-4" />
-                  <span>{isFullscreenTv ? 'Keluar Mode TV' : 'Tampilan Fullscreen TV'}</span>
+                  <Tv className="w-4 h-4 text-emerald-600" />
+                  <span>{isFullscreenTv ? 'Keluar Mode TV' : 'Display Mode TV'}</span>
                 </button>
               </div>
             </div>
@@ -2905,6 +2890,134 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </select>
             </div>
 
+            {/* INTEGRATED TV MONITOR: VIDEO EDUKASI RUANG TUNGGU & LIVE QUEUE CALL STAGE */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+              {/* Kolom Kiri: Layar Pemutar Video Edukasi Ruang Tunggu (Auto-Advance Sequential Playlist) */}
+              <div className="xl:col-span-7 space-y-3">
+                <div className="bg-white text-slate-900 p-3.5 rounded-2xl border-2 border-emerald-200 flex items-center justify-between gap-2 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <Tv className="w-4 h-4 text-emerald-600" />
+                    <div>
+                      <h4 className="font-extrabold text-xs uppercase tracking-wider text-slate-800">
+                        Siaran TV Edukasi Ruang Tunggu Pasien
+                      </h4>
+                      <p className="text-[10px] text-slate-500">
+                        Otomatis berputar berurutan (Video 1 selesai otomatis lanjut Video 2 dst)
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-lg text-[10px] font-bold shrink-0">
+                    🟢 Auto-Loop Aktif
+                  </span>
+                </div>
+
+                <EducationalTvPlayer
+                  videos={adminEduVideos}
+                  activeVideoId={adminActiveVideoId}
+                  onSelectVideo={(id) => setAdminActiveVideoId(id)}
+                  isMuted={isAdminVideoMuted}
+                  onToggleMute={() => setIsAdminVideoMuted((prev) => !prev)}
+                  pauseOnScrollOut={false}
+                  autoPlayNext={true}
+                  showPlaylistSelector={true}
+                  titlePrefix="TV Edukasi Siaga • Monitor Ruang Tunggu"
+                />
+              </div>
+
+              {/* Kolom Kanan: Panggilan Antrean Pasien Terkini (White & Light Green Mint Theme) */}
+              <div className="xl:col-span-5 space-y-4">
+                {(() => {
+                  const currentlyCalled = tickets.find((t) => t.status === 'Called');
+                  const calledPoli = currentlyCalled ? polis.find((p) => p.id === currentlyCalled.poliId) : null;
+                  const waitingCount = tickets.filter((t) => t.status === 'Waiting').length;
+
+                  return (
+                    <div className="bg-gradient-to-br from-white via-emerald-50/80 to-teal-50/70 p-6 rounded-3xl border-2 border-emerald-300 shadow-xl text-slate-900 space-y-5">
+                      <div className="flex items-center justify-between pb-3 border-b border-emerald-200">
+                        <div className="flex items-center gap-2">
+                          <Radio className="w-5 h-5 text-emerald-600 animate-pulse" />
+                          <span className="text-xs font-black uppercase tracking-wider text-emerald-800">
+                            Panggilan Pasien Terkini
+                          </span>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Live Speaker (TTS)
+                        </span>
+                      </div>
+
+                      {currentlyCalled ? (
+                        <div className="text-center space-y-3 py-2">
+                          <div className="text-xs font-extrabold uppercase tracking-widest text-emerald-800">
+                            Nomor Antrean Dipanggil:
+                          </div>
+                          <div className="text-6xl sm:text-7xl font-black font-mono text-emerald-700 tracking-tight drop-shadow-xs animate-pulse">
+                            {currentlyCalled.queueNumber}
+                          </div>
+                          <div className="space-y-1 pt-1">
+                            <h3 className="text-lg font-black text-slate-900">
+                              {currentlyCalled.fullName}
+                            </h3>
+                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100/90 rounded-xl border border-emerald-300 text-xs font-bold text-emerald-900">
+                              <span>{calledPoli?.name || currentlyCalled.poliName}</span>
+                              <span>•</span>
+                              <span className="text-emerald-800 font-extrabold">{calledPoli?.room || 'Ruang Periksa'}</span>
+                            </div>
+                          </div>
+
+                          <div className="pt-3 flex items-center justify-center gap-2">
+                            <button
+                              onClick={() => {
+                                if (calledPoli) handleRecallForPoli(calledPoli.id);
+                              }}
+                              className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer"
+                              title="Panggil Ulang Suara Panggilan"
+                            >
+                              <Volume2 className="w-4 h-4" />
+                              <span>Panggil Ulang Suara</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (calledPoli) handleCompleteForPoli(calledPoli.id);
+                              }}
+                              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition flex items-center gap-2 shadow-sm cursor-pointer"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              <span>Selesai</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 space-y-3">
+                          <div className="w-14 h-14 mx-auto rounded-2xl bg-white border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-2xs">
+                            <Tv className="w-7 h-7 text-emerald-600" />
+                          </div>
+                          <h4 className="font-bold text-sm text-slate-700">
+                            Belum Ada Pasien yang Sedang Dipanggil
+                          </h4>
+                          <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                            Terdapat {waitingCount} pasien menunggu giliran. Silakan klik tombol 'Panggil Pasien Berikutnya' pada salah satu poli di bawah.
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="pt-3 border-t border-emerald-200 grid grid-cols-2 gap-3 text-center text-xs">
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-200 shadow-2xs">
+                          <span className="text-[10px] text-slate-500 block font-bold uppercase">Sisa Menunggu</span>
+                          <span className="text-base font-black text-emerald-800 font-mono">{waitingCount} Pasien</span>
+                        </div>
+                        <div className="p-2.5 bg-white rounded-xl border border-emerald-200 shadow-2xs">
+                          <span className="text-[10px] text-slate-500 block font-bold uppercase">Selesai Hari Ini</span>
+                          <span className="text-base font-black text-emerald-700 font-mono">
+                            {tickets.filter((t) => t.status === 'Completed').length} Pasien
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+
             {/* MAIN TV MONITOR GRID: ALL POLI CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {polis
@@ -2918,59 +3031,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   return (
                     <div
                       key={p.id}
-                      className={`bg-white rounded-3xl border transition-all duration-300 overflow-hidden shadow-xs flex flex-col justify-between ${
+                      className={`bg-white rounded-3xl border-2 transition-all duration-300 overflow-hidden shadow-xs flex flex-col justify-between ${
                         activeTkt
-                          ? 'border-emerald-500 ring-2 ring-emerald-500/20'
-                          : 'border-slate-200 hover:border-slate-300'
+                          ? 'border-emerald-500 ring-2 ring-emerald-300/40 bg-emerald-50/30'
+                          : 'border-slate-200 hover:border-emerald-300'
                       }`}
                     >
                       {/* Poli Header */}
-                      <div className="p-5 bg-slate-900 text-white flex items-center justify-between">
+                      <div className="p-5 bg-gradient-to-r from-emerald-800 to-teal-800 text-white flex items-center justify-between">
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="px-2 py-0.5 bg-emerald-600 text-white font-extrabold text-[10px] rounded-md">
                               KODE {p.queuePrefix}
                             </span>
-                            <span className="text-[10px] text-slate-400 font-medium">{p.room}</span>
+                            <span className="text-[10px] text-emerald-200 font-medium">{p.room}</span>
                           </div>
                           <h3 className="text-base font-black text-white mt-1 line-clamp-1">{p.name}</h3>
-                          <div className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-                            <User className="w-3 h-3 text-emerald-400 shrink-0" />
+                          <div className="text-[11px] text-emerald-100 flex items-center gap-1 mt-0.5">
+                            <User className="w-3 h-3 text-emerald-300 shrink-0" />
                             <span className="line-clamp-1">{p.doctorName}</span>
                           </div>
                         </div>
 
                         <div className="text-right">
-                          <span className="px-2.5 py-1 bg-slate-800 text-emerald-400 border border-slate-700 rounded-lg text-[10px] font-extrabold">
+                          <span className="px-2.5 py-1 bg-emerald-900/80 text-emerald-200 border border-emerald-700 rounded-lg text-[10px] font-extrabold">
                             {waitingTkts.length} Menunggu
                           </span>
                         </div>
                       </div>
 
                       {/* Active Called Queue Number Display */}
-                      <div className="p-6 text-center space-y-4 bg-slate-950 text-white">
-                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 block">
+                      <div className="p-6 text-center space-y-4 bg-emerald-50/50 text-slate-900 border-y border-emerald-100">
+                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-800 block">
                           NOMOR DIPANGGIL SAAT INI
                         </span>
 
                         {activeTkt ? (
                           <div className="space-y-2 animate-pulse">
-                            <div className="text-5xl font-black font-mono tracking-tight text-emerald-400">
+                            <div className="text-5xl font-black font-mono tracking-tight text-emerald-700">
                               {activeTkt.queueNumber}
                             </div>
-                            <div className="text-xs font-bold text-white line-clamp-1">
+                            <div className="text-xs font-bold text-slate-900 line-clamp-1">
                               {activeTkt.fullName} ({activeTkt.patientType})
                             </div>
-                            <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[10px] font-extrabold rounded-full">
+                            <span className="inline-block px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-extrabold rounded-full">
                               ● SEDANG DIPANGGIL SUARA
                             </span>
                           </div>
                         ) : (
                           <div className="space-y-1 py-2">
-                            <div className="text-4xl font-black font-mono text-slate-700">
+                            <div className="text-4xl font-black font-mono text-slate-400">
                               {nextWaiting ? nextWaiting.queueNumber : '-'}
                             </div>
-                            <p className="text-[11px] text-slate-400 font-medium">
+                            <p className="text-[11px] text-slate-500 font-medium">
                               {nextWaiting ? 'Siap Dipanggil Berikutnya' : 'Tidak Ada Antrean Menunggu'}
                             </p>
                           </div>
@@ -2978,11 +3091,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                         {/* Next Waiting Pills */}
                         {waitingTkts.length > 0 && (
-                          <div className="pt-2 border-t border-slate-800">
-                            <span className="text-[10px] text-slate-400 block mb-1.5 font-semibold">Antrean Selanjutnya:</span>
+                          <div className="pt-2 border-t border-emerald-200">
+                            <span className="text-[10px] text-slate-500 block mb-1.5 font-semibold">Antrean Selanjutnya:</span>
                             <div className="flex items-center justify-center gap-1.5 flex-wrap">
                               {waitingTkts.slice(-4).reverse().map((t) => (
-                                <span key={t.id} className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded-md text-[10px] font-mono font-bold">
+                                <span key={t.id} className="px-2 py-0.5 bg-white text-emerald-900 rounded-md text-[10px] font-mono font-bold border border-emerald-200 shadow-2xs">
                                   {t.queueNumber}
                                 </span>
                               ))}
@@ -2997,15 +3110,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
 
                       {/* Action Call Controls for Doctors & Admin */}
-                      <div className="p-4 bg-slate-50 border-t border-slate-200 space-y-2">
+                      <div className="p-4 bg-white border-t border-slate-100 space-y-2">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => handleCallNextForPoli(p.id)}
                             disabled={waitingTkts.length === 0}
                             className={`flex-1 py-2.5 rounded-xl font-extrabold text-xs transition flex items-center justify-center gap-2 shadow-xs ${
                               waitingTkts.length > 0
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+                                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                             }`}
                           >
                             <Volume2 className="w-4 h-4" />
@@ -3017,8 +3130,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             disabled={!activeTkt}
                             className={`p-2.5 rounded-xl font-bold text-xs transition flex items-center justify-center ${
                               activeTkt
-                                ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
-                                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                                ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 cursor-pointer'
+                                : 'bg-slate-100 text-slate-300 cursor-not-allowed'
                             }`}
                             title="Panggil Ulang Suara"
                           >
@@ -3031,7 +3144,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             onClick={() => handleCompleteForPoli(p.id)}
                             disabled={!activeTkt}
                             className={`flex items-center gap-1 font-bold ${
-                              activeTkt ? 'text-emerald-700 hover:text-emerald-900' : 'text-slate-300'
+                              activeTkt ? 'text-emerald-700 hover:text-emerald-900 cursor-pointer' : 'text-slate-300'
                             }`}
                           >
                             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -3042,7 +3155,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             onClick={() => handleSkipForPoli(p.id)}
                             disabled={!activeTkt}
                             className={`flex items-center gap-1 font-bold ${
-                              activeTkt ? 'text-rose-600 hover:text-rose-800' : 'text-slate-300'
+                              activeTkt ? 'text-rose-600 hover:text-rose-800 cursor-pointer' : 'text-slate-300'
                             }`}
                           >
                             <XCircle className="w-3.5 h-3.5" />
@@ -3060,52 +3173,141 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 })}
             </div>
 
-            {/* FULLSCREEN TV DISPLAY OVERLAY */}
+            {/* FULLSCREEN TV DISPLAY OVERLAY - TEMA PUTIH & HIJAU MUDA */}
             {isFullscreenTv && (
-              <div className="fixed inset-0 z-50 bg-slate-950 text-white p-6 sm:p-10 flex flex-col justify-between overflow-y-auto animate-fadeIn">
+              <div className="fixed inset-0 z-50 bg-slate-50 text-slate-900 p-6 sm:p-10 flex flex-col justify-between overflow-y-auto animate-fadeIn">
                 
                 {/* Header TV Screen */}
-                <div className="flex items-center justify-between border-b border-slate-800 pb-6">
+                <div className="flex items-center justify-between border-b-2 border-emerald-200 pb-5 bg-white -mx-6 sm:-mx-10 -mt-6 sm:-mt-10 px-6 sm:px-10 pt-6 sm:pt-8 shadow-xs">
                   <div className="flex items-center gap-4">
                     <PuskesmasLogo className="w-12 h-12" />
                     <div>
-                      <span className="text-xs font-bold uppercase text-emerald-400 tracking-widest block">
+                      <span className="text-xs font-extrabold uppercase text-emerald-800 tracking-widest block">
                         UPTD PUSKESMAS PONDOK BENDA KOTA TANGERANG SELATAN
                       </span>
-                      <h1 className="text-3xl font-black text-white">DISPLAY MONITOR ANTREAN DIPANGGIL</h1>
+                      <h1 className="text-2xl sm:text-3xl font-black text-slate-900">DISPLAY MONITOR ANTREAN DIPANGGIL</h1>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4">
-                    <div className="text-right hidden sm:block">
-                      <span className="text-xs font-mono font-bold text-amber-400 block">
+                  <div className="flex items-center gap-3">
+                    <div className="text-right hidden sm:block mr-1">
+                      <span className="text-xs font-mono font-bold text-emerald-800 block">
                         {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                       </span>
-                      <span className="text-xs text-slate-400">Jam Operasional: 07.30 - 14.00 WIB</span>
+                      <span className="text-xs text-slate-500 font-medium">Jam Operasional: 07.30 - 14.00 WIB</span>
                     </div>
 
+                    {/* Toggle Native Full Screen Button (Hide Browser UI) */}
                     <button
-                      onClick={() => setIsFullscreenTv(false)}
-                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-extrabold rounded-xl transition border border-slate-700 flex items-center gap-2"
+                      onClick={toggleNativeFullscreen}
+                      className={`px-3.5 py-2.5 text-xs font-extrabold rounded-xl transition border-2 flex items-center gap-2 shadow-xs cursor-pointer ${
+                        isNativeFullscreen
+                          ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500'
+                      }`}
+                      title={isNativeFullscreen ? 'Keluar dari Full Screen Browser' : 'Sembunyikan UI Browser (Mode Layar Penuh TV)'}
                     >
-                      <Minimize2 className="w-4 h-4" />
+                      {isNativeFullscreen ? <Minimize2 className="w-4 h-4 text-amber-700" /> : <Maximize2 className="w-4 h-4 text-white" />}
+                      <span>{isNativeFullscreen ? 'Keluar Full Screen' : 'Full Screen (Sembunyikan Browser)'}</span>
+                    </button>
+
+                    {/* Close Mode TV Button */}
+                    <button
+                      onClick={handleCloseFullscreenTv}
+                      className="px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-800 text-xs font-extrabold rounded-xl transition border-2 border-slate-300 flex items-center gap-2 shadow-xs cursor-pointer"
+                      title="Tutup Mode Display TV"
+                    >
+                      <X className="w-4 h-4 text-rose-600" />
                       <span>Tutup Mode TV</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Running Marquee Text */}
-                <div className="my-4 p-3 bg-emerald-950/60 border border-emerald-800/60 rounded-2xl overflow-hidden flex items-center gap-3">
-                  <span className="px-2.5 py-1 bg-emerald-600 text-white font-black text-[10px] rounded-lg shrink-0 uppercase tracking-wider">
+                <div className="my-4 p-3 bg-emerald-100/90 border-2 border-emerald-300 rounded-2xl overflow-hidden flex items-center gap-3 shadow-2xs">
+                  <span className="px-2.5 py-1 bg-emerald-700 text-white font-black text-[10px] rounded-lg shrink-0 uppercase tracking-wider">
                     PEMBERITAHUAN
                   </span>
-                  <marquee className="text-xs font-bold text-emerald-200">
-                    Selamat datang di Puskesmas Pondok Benda Tangsel. Mohon persiapkan KTP / Kartu BPJS Kesehatan saat nomor antrean Anda dipanggil. Bagi pasien lansia & disabilitas disediakan kuota diprioritaskan. Terima kasih atas ketertiban Anda.
+                  <marquee className="text-xs font-bold text-emerald-950">
+                    Selamat datang di Puskesmas Pondok Benda Tangsel. Mohon persiapkan KTP / Kartu BPJS Kesehatan saat nomor antrean Anda dipanggil. Bagi pasien lansia & disabilitas disediakan kuota diprioritaskan. Panggilan antrean diumumkan secara otomatis menggunakan sistem suara speaker. Terima kasih atas ketertiban Anda.
                   </marquee>
                 </div>
 
-                {/* TV Grid: ALL POLI CARDS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 my-4 flex-1">
+                {/* TV SCREEN MAIN STAGE: VIDEO EDUKASI PASIEN & DISPLAY PANGGILAN RAKSASA */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 my-4 items-stretch">
+                  {/* Left Column: Educational TV Player (Sequential Auto-Advance) */}
+                  <div className="lg:col-span-7 flex flex-col justify-between">
+                    <EducationalTvPlayer
+                      videos={adminEduVideos}
+                      activeVideoId={adminActiveVideoId}
+                      onSelectVideo={(id) => setAdminActiveVideoId(id)}
+                      isMuted={isAdminVideoMuted}
+                      onToggleMute={() => setIsAdminVideoMuted((prev) => !prev)}
+                      pauseOnScrollOut={false}
+                      autoPlayNext={true}
+                      showPlaylistSelector={true}
+                      titlePrefix="TV Edukasi Siaga • Siaran Ruang Tunggu"
+                    />
+                  </div>
+
+                  {/* Right Column: Giant Call Monitor Box (White & Light Green Mint) */}
+                  <div className="lg:col-span-5 bg-gradient-to-br from-white via-emerald-50/90 to-teal-50/70 rounded-3xl p-6 sm:p-8 border-2 border-emerald-300 shadow-xl flex flex-col justify-between text-center">
+                    {(() => {
+                      const currentlyCalled = tickets.find((t) => t.status === 'Called');
+                      const calledPoli = currentlyCalled ? polis.find((p) => p.id === currentlyCalled.poliId) : null;
+                      const waitingTotal = tickets.filter((t) => t.status === 'Waiting').length;
+
+                      return (
+                        <>
+                          <div className="space-y-1">
+                            <span className="px-3.5 py-1.5 bg-emerald-600 text-white font-black text-xs rounded-full uppercase tracking-widest inline-block shadow-xs">
+                              NOMOR ANTREAN DIPANGGIL SAAT INI
+                            </span>
+                            <p className="text-xs text-emerald-800 font-bold pt-1">
+                              Silakan Menuju Loket / Ruang Poliklinik Terkait
+                            </p>
+                          </div>
+
+                          <div className="my-4 py-2">
+                            <div className="text-7xl sm:text-8xl font-black font-mono text-emerald-700 tracking-tight drop-shadow-xs animate-pulse">
+                              {currentlyCalled ? currentlyCalled.queueNumber : '-'}
+                            </div>
+                            {currentlyCalled ? (
+                              <div className="mt-3 space-y-2">
+                                <h2 className="text-2xl font-black text-slate-900">
+                                  {currentlyCalled.fullName}
+                                </h2>
+                                <div className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-900 rounded-2xl border-2 border-emerald-300 font-extrabold text-sm sm:text-base">
+                                  {calledPoli?.name || currentlyCalled.poliName} • <span className="text-emerald-800">{calledPoli?.room || 'Ruang Periksa'}</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-sm font-semibold text-slate-500 mt-2">
+                                Belum ada panggilan pasien aktif
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="pt-4 border-t border-emerald-200 grid grid-cols-2 gap-3 text-xs">
+                            <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                              <span className="text-slate-500 text-[10px] uppercase font-bold block">Total Menunggu</span>
+                              <span className="text-lg font-black text-emerald-800 font-mono">{waitingTotal} Pasien</span>
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-emerald-200 shadow-2xs">
+                              <span className="text-slate-500 text-[10px] uppercase font-bold block">Selesai Dilayani</span>
+                              <span className="text-lg font-black text-emerald-700 font-mono">
+                                {tickets.filter((t) => t.status === 'Completed').length} Pasien
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+
+                {/* TV Grid: ALL POLI CARDS (White & Light Green) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 my-4">
                   {polis.map((p) => {
                     const activeTkt = tickets.find(t => t.poliId === p.id && t.status === 'Called');
                     const waitingCount = tickets.filter(t => t.poliId === p.id && t.status === 'Waiting').length;
@@ -3113,35 +3315,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     return (
                       <div
                         key={p.id}
-                        className={`bg-slate-900 rounded-3xl p-6 border flex flex-col justify-between text-center transition-all ${
-                          activeTkt ? 'border-emerald-500 bg-slate-900/90 shadow-2xl ring-4 ring-emerald-500/20' : 'border-slate-800'
+                        className={`bg-white rounded-3xl p-5 border-2 flex flex-col justify-between text-center transition-all shadow-sm ${
+                          activeTkt
+                            ? 'border-emerald-500 bg-emerald-50/60 shadow-xl ring-4 ring-emerald-300/40'
+                            : 'border-emerald-200/90 hover:border-emerald-400'
                         }`}
                       >
                         <div className="space-y-1">
-                          <span className="px-2.5 py-0.5 bg-slate-800 text-amber-400 text-[10px] font-extrabold rounded-md uppercase tracking-wider">
+                          <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-900 text-[10px] font-extrabold rounded-md uppercase tracking-wider border border-emerald-200">
                             Poli {p.name}
                           </span>
-                          <p className="text-xs text-slate-400 font-semibold">{p.room}</p>
+                          <p className="text-xs text-slate-500 font-semibold">{p.room}</p>
                         </div>
 
-                        <div className="my-6 space-y-2">
-                          <div className="text-6xl font-black font-mono text-emerald-400 tracking-tight">
+                        <div className="my-5 space-y-2">
+                          <div className="text-5xl font-black font-mono text-emerald-700 tracking-tight">
                             {activeTkt ? activeTkt.queueNumber : '-'}
                           </div>
                           {activeTkt ? (
-                            <div className="text-xs font-extrabold text-white line-clamp-1 bg-emerald-950/80 px-3 py-1.5 rounded-xl border border-emerald-800">
+                            <div className="text-xs font-extrabold text-white line-clamp-1 bg-emerald-600 px-3 py-1.5 rounded-xl shadow-2xs">
                               {activeTkt.fullName}
                             </div>
                           ) : (
-                            <div className="text-xs text-slate-500">Antrean Menunggu: {waitingCount} Pasien</div>
+                            <div className="text-xs text-slate-500 font-medium">Antrean Menunggu: {waitingCount} Pasien</div>
                           )}
                         </div>
 
-                        <div className="pt-3 border-t border-slate-800 flex items-center justify-center gap-2">
+                        <div className="pt-3 border-t border-slate-100 flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleCallNextForPoli(p.id)}
                             disabled={waitingCount === 0}
-                            className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-extrabold rounded-xl transition flex items-center gap-1 disabled:opacity-30"
+                            className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl transition flex items-center gap-1 disabled:opacity-30 shadow-xs cursor-pointer"
                           >
                             <Volume2 className="w-3.5 h-3.5" />
                             <span>Panggil</span>
@@ -3149,7 +3353,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           {activeTkt && (
                             <button
                               onClick={() => handleRecallForPoli(p.id)}
-                              className="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-extrabold rounded-xl transition flex items-center gap-1"
+                              className="px-3 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-extrabold rounded-xl transition flex items-center gap-1 shadow-xs cursor-pointer"
                             >
                               <RefreshCw className="w-3.5 h-3.5" />
                               <span>Ulang</span>
@@ -3163,9 +3367,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
 
                 {/* Footer TV */}
-                <div className="pt-4 border-t border-slate-800 flex items-center justify-between text-xs text-slate-500 font-semibold">
+                <div className="pt-4 border-t-2 border-emerald-200 flex items-center justify-between text-xs text-slate-600 font-semibold">
                   <span>Puskesmas Pondok Benda Tangsel - Pelayanan Kesehatan Terpadu Masyarakat</span>
-                  <span>Call Center / WA: 0812-9876-5432</span>
+                  <span>Sistem Antrean & Edukasi Digital Fullscreen TV</span>
                 </div>
 
               </div>
@@ -3451,15 +3655,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
-        {/* VIEW 10: CONFUSION MATRIX EVALUATION */}
-        {activeMenu === 'confusion-matrix' && (
-          <ConfusionMatrixPage onBack={() => setActiveMenu('antrean')} />
-        )}
-
-        {/* VIEW: CLASS DIAGRAM & UML SISTEM */}
-        {activeMenu === 'class-diagram' && (
-          <ClassDiagramView />
-        )}
 
         {/* VIEW: GOOGLE SHEET REKAP PENDAFTARAN PASIEN */}
         {activeMenu === 'google-sheet' && (
@@ -3711,10 +3906,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* Doctor Photo Section */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                <span className="text-xs font-extrabold text-slate-900 block">Foto Dokter (Galeri / Upload / Preset):</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-900 block">Foto Profil Dokter:</span>
+                  {doctorForm.photoUrl && (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      ✓ Foto Terpasang
+                    </span>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-white border border-slate-300 overflow-hidden shrink-0 shadow-2xs flex items-center justify-center text-slate-400">
+                  <div className="w-16 h-16 rounded-2xl bg-white border-2 border-emerald-500/30 overflow-hidden shrink-0 shadow-2xs flex items-center justify-center text-slate-400">
                     {doctorForm.photoUrl ? (
                       <img
                         src={doctorForm.photoUrl}
@@ -3722,21 +3924,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <User className="w-8 h-8 text-slate-400" />
+                      <div className="flex flex-col items-center justify-center p-1 text-center">
+                        <User className="w-8 h-8 text-slate-400" />
+                      </div>
                     )}
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-1.5 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <label htmlFor="doctor-photo-upload" className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition inline-flex items-center gap-2 cursor-pointer shadow-xs">
-                        <PlusCircle className="w-3.5 h-3.5" />
+                      <label htmlFor="doctor-photo-upload" className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition inline-flex items-center gap-2 cursor-pointer shadow-xs active:scale-95">
+                        <PlusCircle className="w-4 h-4" />
                         <span>Pilih Foto dari Galeri</span>
                       </label>
                       {doctorForm.photoUrl && (
                         <button
                           type="button"
                           onClick={() => setDoctorForm({ ...doctorForm, photoUrl: '' })}
-                          className="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold text-xs rounded-xl transition inline-flex items-center gap-1"
+                          className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl transition inline-flex items-center gap-1.5 border border-rose-200"
                         >
                           <X className="w-3.5 h-3.5" />
                           <span>Hapus Foto</span>
@@ -3750,41 +3954,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       onChange={handleDoctorPhotoUpload}
                       className="hidden"
                     />
-                    <p className="text-[10px] text-slate-500">Biarkan kosong jika tidak ingin menggunakan foto profil</p>
+                    <p className="text-[11px] text-slate-500 leading-snug">
+                      Pilih foto dari galeri HP atau komputer. Foto otomatis dikompresi dan langsung tersinkron di website setelah disimpan.
+                    </p>
                   </div>
-                </div>
-
-                {/* Preset Avatars */}
-                <div className="space-y-1">
-                  <span className="text-[10px] font-bold text-slate-600 block">Preset Foto Profesional:</span>
-                  <div className="flex items-center gap-2">
-                    {[
-                      { name: 'Dokter Pria 1', url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=300' },
-                      { name: 'Dokter Pria 2', url: 'https://images.unsplash.com/photo-1537368910025-700350fe46c7?auto=format&fit=crop&q=80&w=300' },
-                      { name: 'Dokter Wanita 1', url: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300' },
-                      { name: 'Dokter Wanita 2', url: 'https://images.unsplash.com/photo-1594824813566-788530791f4d?auto=format&fit=crop&q=80&w=300' }
-                    ].map((preset, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setDoctorForm({ ...doctorForm, photoUrl: preset.url })}
-                        className="w-9 h-9 rounded-xl border border-slate-300 overflow-hidden hover:scale-105 transition"
-                        title={preset.name}
-                      >
-                        <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <input
-                    type="text"
-                    value={doctorForm.photoUrl || ''}
-                    onChange={(e) => setDoctorForm({ ...doctorForm, photoUrl: e.target.value })}
-                    placeholder="Atau tempelkan URL Foto (https://...)"
-                    className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-900"
-                  />
                 </div>
               </div>
 
@@ -3854,28 +4027,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Ruangan Praktik</label>
-                  <input
-                    type="text"
-                    value={doctorForm.room || ''}
-                    onChange={(e) => setDoctorForm({ ...doctorForm, room: e.target.value })}
-                    placeholder="Contoh: Ruang BPU / Lt. 1 R-102"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">Nomor SIP Dokter</label>
-                  <input
-                    type="text"
-                    value={doctorForm.sipNumber || ''}
-                    onChange={(e) => setDoctorForm({ ...doctorForm, sipNumber: e.target.value })}
-                    placeholder="446.1/045/SIP.D/2024"
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Ruangan Praktik</label>
+                <input
+                  type="text"
+                  value={doctorForm.room || ''}
+                  onChange={(e) => setDoctorForm({ ...doctorForm, room: e.target.value })}
+                  placeholder="Contoh: Ruang BPU (Pemeriksaan Dewasa) / Poli Gigi Lt. 2"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"
+                />
               </div>
 
               <div>
@@ -3924,17 +4084,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Deskripsi / Profil Singkat Dokter (Opsional)
+                </label>
+                <textarea
+                  rows={3}
+                  value={doctorForm.description || ''}
+                  onChange={(e) => setDoctorForm({ ...doctorForm, description: e.target.value })}
+                  placeholder="Contoh: Berpengalaman menangani konsultasi medis umum, lansia geriatri, skrining PTM, dan layanan promotif preventif..."
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900 resize-none focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Deskripsi ini langsung tersimpan dan tampil pada profil dokter.</p>
+              </div>
+
               <div className="pt-2 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsDoctorModalOpen(false)}
-                  className="px-4 py-2.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-xl"
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-emerald-600 text-white font-bold text-xs rounded-xl shadow-xs"
+                  className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-xs transition"
                 >
                   Simpan Data Dokter
                 </button>
@@ -3942,6 +4116,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </form>
 
           </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS DOKTER (IN-APP MODAL, TIDAK TERBLOKIR IFRAME) */}
+      {doctorToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 overflow-hidden relative">
+            <div className="p-6 bg-rose-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                  <Trash2 className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold">Hapus Data Dokter?</h3>
+                  <p className="text-xs text-rose-100">Tindakan ini permanen dan menghapus profil</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setDoctorToDelete(null)}
+                className="text-white/80 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl space-y-1.5">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-600 block">
+                  DATA DOKTER YANG AKAN DIHAPUS:
+                </span>
+                <h4 className="font-extrabold text-sm text-slate-900">
+                  {doctorToDelete.doctorName}
+                </h4>
+                <p className="text-xs text-slate-600">
+                  Unit: <strong>{doctorToDelete.poliName}</strong> • {doctorToDelete.specialty}
+                </p>
+              </div>
+
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Apakah Anda yakin ingin menghapus data dokter ini? Dokter tidak akan lagi muncul dalam jadwal praktik maupun pilihan poliklinik.
+              </p>
+
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setDoctorToDelete(null)}
+                  className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmDeleteDoctor}
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition shadow-sm shadow-rose-600/30 flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Ya, Hapus Dokter</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* FLOATING ACTION NOTIFICATION TOAST */}
+      {actionNotification && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 animate-fadeIn">
+          {actionNotification.type === 'success' ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
+          )}
+          <span className="text-xs font-bold">{actionNotification.message}</span>
+          <button
+            onClick={() => setActionNotification(null)}
+            className="text-slate-400 hover:text-white ml-2 p-1 text-xs"
+          >
+            ✕
+          </button>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { INITIAL_POLIS, INITIAL_DOCTORS, INITIAL_ARTICLES, INITIAL_ANNOUNCEMENTS, INITIAL_TICKETS } from './src/data/mockData.js';
@@ -12,9 +13,32 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+const DOCTORS_STORAGE_FILE = path.join(process.cwd(), 'doctors_store.json');
+
+function loadDoctorsStore(): any[] {
+  try {
+    if (fs.existsSync(DOCTORS_STORAGE_FILE)) {
+      const data = fs.readFileSync(DOCTORS_STORAGE_FILE, 'utf-8');
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.error('Error loading doctors_store.json:', e);
+  }
+  return [...INITIAL_DOCTORS];
+}
+
+function saveDoctorsStore(list: any[]) {
+  try {
+    fs.writeFileSync(DOCTORS_STORAGE_FILE, JSON.stringify(list, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Error saving doctors_store.json:', e);
+  }
+}
+
 // In-Memory Data Stores (used as active cache and seamless fallback)
 let polisStore: PoliService[] = [...INITIAL_POLIS];
-let doctorsStore = [...INITIAL_DOCTORS];
+let doctorsStore = loadDoctorsStore();
 let articlesStore = [...INITIAL_ARTICLES];
 let announcementsStore = [...INITIAL_ANNOUNCEMENTS];
 let ticketsStore: QueueTicket[] = [...INITIAL_TICKETS];
@@ -421,7 +445,7 @@ app.get('/api/jadwal-dokter', (req, res) => {
 });
 
 app.post('/api/jadwal-dokter', (req, res) => {
-  const { doctorName, specialty, poliName, poliId, days, hours, quotaPerDay, status, photoUrl, klasterNumber, klasterName, sipNumber, room } = req.body;
+  const { doctorName, specialty, poliName, poliId, days, hours, quotaPerDay, status, photoUrl, klasterNumber, klasterName, sipNumber, room, description } = req.body;
   if (!doctorName || !poliName) {
     res.status(400).json({ success: false, message: 'Nama Dokter dan Poli wajib diisi' });
     return;
@@ -441,9 +465,11 @@ app.post('/api/jadwal-dokter', (req, res) => {
     status: status || 'Hadir',
     photoUrl: photoUrl || '',
     sipNumber: sipNumber || '',
-    room: room || 'Ruang Pemeriksaan'
+    room: room || 'Ruang Pemeriksaan',
+    description: description || ''
   };
   doctorsStore.unshift(newDoctor);
+  saveDoctorsStore(doctorsStore);
   res.json({ success: true, message: 'Dokter berhasil ditambahkan', data: newDoctor });
 });
 
@@ -451,16 +477,21 @@ app.put('/api/jadwal-dokter/:id', (req, res) => {
   const { id } = req.params;
   const idx = doctorsStore.findIndex(d => d.id === id);
   if (idx === -1) {
-    res.status(404).json({ success: false, message: 'Dokter tidak ditemukan' });
+    const newDoc = { id, ...req.body };
+    doctorsStore.unshift(newDoc);
+    saveDoctorsStore(doctorsStore);
+    res.json({ success: true, message: 'Data dokter berhasil disimpan', data: newDoc });
     return;
   }
   doctorsStore[idx] = { ...doctorsStore[idx], ...req.body };
+  saveDoctorsStore(doctorsStore);
   res.json({ success: true, message: 'Data dokter berhasil diperbarui', data: doctorsStore[idx] });
 });
 
 app.delete('/api/jadwal-dokter/:id', (req, res) => {
   const { id } = req.params;
   doctorsStore = doctorsStore.filter(d => d.id !== id);
+  saveDoctorsStore(doctorsStore);
   res.json({ success: true, message: 'Dokter berhasil dihapus' });
 });
 
@@ -882,7 +913,11 @@ async function startServer() {
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+        watch: null,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -894,8 +929,28 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Puskesmas Pondok Benda Tangsel App running on http://0.0.0.0:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`[Server] Port ${PORT} sedang digunakan oleh proses lain, mencoba menunggu pelepasan port...`);
+    } else {
+      console.error('[Server Error]:', err);
+    }
+  });
+
+  process.on('SIGTERM', () => {
+    server.close(() => {
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGINT', () => {
+    server.close(() => {
+      process.exit(0);
+    });
   });
 }
 

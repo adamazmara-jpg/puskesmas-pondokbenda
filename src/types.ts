@@ -97,6 +97,7 @@ export interface DoctorSchedule {
   photoUrl?: string;
   sipNumber?: string;
   room?: string;
+  description?: string;
 }
 
 export interface HealthArticle {
