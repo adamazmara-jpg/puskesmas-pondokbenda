@@ -181,9 +181,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
   // Helper: Text to speech voice call for queue (Chime + Indonesian TTS)
-  const speakQueueCall = (queueNumber: string, patientName: string, poliName: string, room: string) => {
+  const speakQueueCall = (queueNumber: string, patientName: string, poliName: string, room: string, doctorName?: string) => {
     if (!isAudioEnabled) return;
-    playFullQueueCall(queueNumber, poliName, patientName, room);
+    playFullQueueCall(queueNumber, poliName, patientName, room, doctorName);
   };
 
   const handleTestAudio = () => {
@@ -1024,12 +1024,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     );
     const nextTicket = sorted[0];
 
+    const matchedDoc = doctors.find(d => d.doctorName === nextTicket.doctorName);
     const poliObj = polis.find(p => p.id === poliId);
-    const roomName = poliObj?.room || 'Ruang Pemeriksaan';
-    const poliName = poliObj?.name || 'Poli';
+    const roomName = matchedDoc?.room || poliObj?.room || 'Ruang Pemeriksaan';
+    const poliName = nextTicket.poliName || poliObj?.name || 'Poli';
+    const doctorName = nextTicket.doctorName || matchedDoc?.doctorName || poliObj?.doctorName;
 
     onUpdateStatus(nextTicket.id, 'Called');
-    speakQueueCall(nextTicket.queueNumber, nextTicket.fullName, poliName, roomName);
+    speakQueueCall(nextTicket.queueNumber, nextTicket.fullName, poliName, roomName, doctorName);
   };
 
   const handleRecallForPoli = (poliId: string) => {
@@ -1042,12 +1044,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setTimeout(() => setBackupAlert(null), 3000);
       return;
     }
+    const matchedDoc = doctors.find(d => d.doctorName === activeTicket.doctorName);
     const poliObj = polis.find(p => p.id === poliId);
+    const roomName = matchedDoc?.room || poliObj?.room || 'Ruang Pemeriksaan';
+    const poliName = activeTicket.poliName || poliObj?.name || 'Poli';
+    const doctorName = activeTicket.doctorName || matchedDoc?.doctorName || poliObj?.doctorName;
+
     speakQueueCall(
       activeTicket.queueNumber,
       activeTicket.fullName,
-      poliObj?.name || 'Poli',
-      poliObj?.room || 'Ruang Pemeriksaan'
+      poliName,
+      roomName,
+      doctorName
     );
   };
 
@@ -2957,10 +2965,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <h3 className="text-lg font-black text-slate-900">
                               {currentlyCalled.fullName}
                             </h3>
-                            <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100/90 rounded-xl border border-emerald-300 text-xs font-bold text-emerald-900">
-                              <span>{calledPoli?.name || currentlyCalled.poliName}</span>
-                              <span>•</span>
-                              <span className="text-emerald-800 font-extrabold">{calledPoli?.room || 'Ruang Periksa'}</span>
+                            <div className="inline-flex flex-col sm:flex-row items-center gap-1 sm:gap-2 px-3.5 py-1.5 bg-emerald-100/90 rounded-xl border border-emerald-300 text-xs font-bold text-emerald-900">
+                              <span>{calledPoli?.name || currentlyCalled.poliName} • <span className="text-emerald-800 font-extrabold">{calledPoli?.room || 'Ruang Periksa'}</span></span>
+                              {currentlyCalled.doctorName && (
+                                <>
+                                  <span className="hidden sm:inline">•</span>
+                                  <span className="text-emerald-950 font-black">Dokter: {currentlyCalled.doctorName}</span>
+                                </>
+                              )}
                             </div>
                           </div>
 
@@ -3049,7 +3061,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <h3 className="text-base font-black text-white mt-1 line-clamp-1">{p.name}</h3>
                           <div className="text-[11px] text-emerald-100 flex items-center gap-1 mt-0.5">
                             <User className="w-3 h-3 text-emerald-300 shrink-0" />
-                            <span className="line-clamp-1">{p.doctorName}</span>
+                            <span className="line-clamp-1">{activeTkt?.doctorName || p.doctorName}</span>
                           </div>
                         </div>
 
@@ -3278,7 +3290,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   {currentlyCalled.fullName}
                                 </h2>
                                 <div className="inline-block px-4 py-1.5 bg-emerald-100 text-emerald-900 rounded-2xl border-2 border-emerald-300 font-extrabold text-sm sm:text-base">
-                                  {calledPoli?.name || currentlyCalled.poliName} • <span className="text-emerald-800">{calledPoli?.room || 'Ruang Periksa'}</span>
+                                  <div>{calledPoli?.name || currentlyCalled.poliName} • <span className="text-emerald-800">{calledPoli?.room || 'Ruang Periksa'}</span></div>
+                                  {currentlyCalled.doctorName && (
+                                    <div className="text-xs font-black text-emerald-950 mt-1">
+                                      Dokter Pemeriksa: {currentlyCalled.doctorName}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             ) : (
@@ -3326,6 +3343,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             Poli {p.name}
                           </span>
                           <p className="text-xs text-slate-500 font-semibold">{p.room}</p>
+                          <p className="text-[11px] text-emerald-800 font-bold truncate">
+                            {activeTkt?.doctorName || p.doctorName}
+                          </p>
                         </div>
 
                         <div className="my-5 space-y-2">

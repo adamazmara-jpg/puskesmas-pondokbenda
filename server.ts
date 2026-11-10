@@ -426,6 +426,8 @@ app.put('/api/antrean/:id/status', (req, res) => {
   if (req.body.statusBPU) ticketsStore[ticketIndex].statusBPU = req.body.statusBPU;
   if (req.body.timestampLab) ticketsStore[ticketIndex].timestampLab = req.body.timestampLab;
 
+  if (req.body.doctorName) ticketsStore[ticketIndex].doctorName = req.body.doctorName;
+
   const updatedTicket = ticketsStore[ticketIndex];
 
   // If status changed to Called, update active queue number in poli
@@ -437,6 +439,44 @@ app.put('/api/antrean/:id/status', (req, res) => {
   }
 
   res.json({ success: true, message: `Status antrean diubah menjadi ${status}`, data: updatedTicket });
+});
+
+// 5b. Update Specific Fields of Ticket (Doctor assignment from Loket, poli, notes, etc.)
+app.put('/api/antrean/:id', (req, res) => {
+  const { id } = req.params;
+  const ticketIndex = ticketsStore.findIndex(t => t.id === id);
+  if (ticketIndex === -1) {
+    res.status(404).json({ success: false, message: 'Tiket tidak ditemukan' });
+    return;
+  }
+
+  const updates = req.body;
+  const allowedKeys: (keyof QueueTicket)[] = [
+    'doctorName', 'poliId', 'poliName', 'klasterNumber', 'klasterName',
+    'status', 'hadir', 'timestampBPU', 'timestampApotek', 'statusBPU',
+    'timestampLab', 'chiefComplaint', 'timeSlot', 'appointmentDate',
+    'familyHead', 'medicalRecordNo', 'fee', 'fullName', 'phone', 'address'
+  ];
+
+  for (const key of allowedKeys) {
+    if (updates[key] !== undefined) {
+      (ticketsStore[ticketIndex] as any)[key] = updates[key];
+    }
+  }
+
+  const updatedTicket = ticketsStore[ticketIndex];
+
+  // If MySQL is active, sync doctorName change
+  if (updates.doctorName && isDbConnected()) {
+    queryDb('UPDATE antrean SET nama_dokter = ? WHERE nomor_antrean = ? OR nik = ?', [
+      updates.doctorName,
+      updatedTicket.queueNumber,
+      updatedTicket.nik
+    ]).catch(() => {});
+  }
+
+  console.log(`[Ticket Update] Tiket ${updatedTicket.queueNumber} diperbarui: Dokter=${updatedTicket.doctorName}, Poli=${updatedTicket.poliName}`);
+  res.json({ success: true, message: 'Data tiket antrean berhasil diperbarui', data: updatedTicket });
 });
 
 // 6. Get & Manage Doctors
@@ -916,6 +956,7 @@ async function startServer() {
       server: {
         middlewareMode: true,
         hmr: false,
+        ws: false,
         watch: null,
       },
       appType: 'spa',

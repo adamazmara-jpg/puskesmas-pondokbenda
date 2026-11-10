@@ -17,7 +17,7 @@ import { Footer } from './components/Footer';
 
 import { PoliService, QueueTicket, DoctorSchedule, HealthArticle, Announcement, QueueStatus } from './types';
 import { INITIAL_POLIS, INITIAL_DOCTORS, INITIAL_ARTICLES, INITIAL_ANNOUNCEMENTS, INITIAL_TICKETS } from './data/mockData';
-import { createRmeForRegisteredPatient } from './data/rmeDatabase';
+import { createRmeForRegisteredPatient, getAllRmeRecords, addOrUpdateRmeRecord } from './data/rmeDatabase';
 import { ClassDiagramView } from './components/ClassDiagramView';
 
 export default function App() {
@@ -136,10 +136,56 @@ export default function App() {
   };
 
   // Update specific fields of a ticket (e.g. assigning doctor from Loket)
-  const handleUpdateTicket = (ticketId: string, updates: Partial<QueueTicket>) => {
+  const handleUpdateTicket = async (ticketId: string, updates: Partial<QueueTicket>) => {
+    // 1. Optimistic local state update
     setTickets((prev) =>
       prev.map((t) => (t.id === ticketId ? { ...t, ...updates } : t))
     );
+
+    // 2. Persist to backend server API
+    try {
+      await fetch(`/api/antrean/${ticketId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+    } catch (e) {
+      console.error('Error persisting ticket update to backend:', e);
+    }
+
+    // 3. Persist to localStorage fallback
+    try {
+      const saved = localStorage.getItem('puskesmas_queue_tickets');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const updated = parsed.map((t: any) => (t.id === ticketId ? { ...t, ...updates } : t));
+          localStorage.setItem('puskesmas_queue_tickets', JSON.stringify(updated));
+        }
+      }
+    } catch (e) {}
+
+    // 4. Also synchronize RME record doctorName if doctor was adjusted
+    if (updates.doctorName) {
+      try {
+        const allRme = getAllRmeRecords();
+        const targetTicket = tickets.find((t) => t.id === ticketId);
+        if (targetTicket) {
+          const cleanNik = targetTicket.nik.replace(/\D/g, '');
+          const matchRme = allRme.find(
+            (r) => (cleanNik && r.patientNik.replace(/\D/g, '') === cleanNik) || r.id === targetTicket.id
+          );
+          if (matchRme) {
+            matchRme.doctorName = updates.doctorName;
+            if (updates.poliName) matchRme.poliName = updates.poliName;
+            if (updates.poliId) matchRme.poliId = updates.poliId;
+            addOrUpdateRmeRecord(matchRme);
+          }
+        }
+      } catch (err) {
+        console.warn('Gagal sinkronisasi nama dokter ke RME:', err);
+      }
+    }
   };
 
   const handleTicketCreated = (newTicket: QueueTicket) => {

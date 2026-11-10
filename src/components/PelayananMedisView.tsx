@@ -508,7 +508,12 @@ export const PelayananMedisView: React.FC<PelayananMedisViewProps> = ({
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const currentDoc = docObj || (ticket.doctorName ? findDoctorForTicket(ticket, allDoctors) : activeDoctor);
-      const text = `Panggilan pemeriksaan dokter. Nomor antrean ${ticket.queueNumber.replace('-', ' ')}, atas nama Bapak atau Ibu ${ticket.fullName}, silakan masuk ke Ruang Pemeriksaan ${ticket.poliName || (currentDoc ? currentDoc.room : 'Dokter')}.`;
+      const docName = ticket.doctorName || currentDoc?.doctorName;
+      const room = currentDoc?.room || ticket.poliName || 'Ruang Pemeriksaan';
+      let text = `Panggilan pemeriksaan dokter. Nomor antrean ${ticket.queueNumber.replace('-', ' ')}, atas nama Bapak atau Ibu ${ticket.fullName}, silakan masuk ke ${room}.`;
+      if (docName) {
+        text += ` Dokter pemeriksa, ${docName}.`;
+      }
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'id-ID';
       utterance.rate = 0.88;
@@ -517,9 +522,10 @@ export const PelayananMedisView: React.FC<PelayananMedisViewProps> = ({
   };
 
   const handleCallPatient = (ticket: QueueTicket, overrideDoctor?: DoctorSchedule) => {
-    // Pastikan pemeriksaan dilakukan atas nama dokter yang dipilih pasien
-    const assignedDoc = overrideDoctor || findDoctorForTicket(ticket, allDoctors);
-    if (assignedDoc && activeDoctor && assignedDoc.id !== activeDoctor.id) {
+    // Prioritaskan dokter yang telah ditetapkan di Loket Pendaftaran
+    const ticketDoc = findDoctorForTicket(ticket, allDoctors);
+    const assignedDoc = ticketDoc || overrideDoctor;
+    if (assignedDoc && (!activeDoctor || assignedDoc.id !== activeDoctor.id)) {
       setSelectedDoctorId(assignedDoc.id);
       const klasterNum = getDoctorKlasterNumber(assignedDoc);
       setSelectedKlasterNumber(klasterNum);
@@ -1132,7 +1138,7 @@ export const PelayananMedisView: React.FC<PelayananMedisViewProps> = ({
                           {tkt.status !== 'Completed' ? (
                             isAssignedToActiveDoctor || !hasSpecificDoctor ? (
                               <button
-                                onClick={() => handleCallPatient(tkt, activeDoctor)}
+                                onClick={() => handleCallPatient(tkt, assignedDoctor || activeDoctor)}
                                 className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs ${
                                   isCurrent
                                     ? 'bg-emerald-800 text-white'
